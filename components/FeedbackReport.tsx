@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { EvaluationReport } from '../types';
 
@@ -25,12 +24,12 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
             <div className="flex items-center gap-2 mb-2">
               <span className="bg-red-600 text-[10px] font-black px-2 py-0.5 rounded tracking-[0.2em] uppercase">Official</span>
             </div>
-            <h1 className="brand-font text-4xl font-black tracking-tight mb-1">ANATOMY GURU</h1>
+            <h1 className="brand-font text-4xl font-black tracking-tight mb-1 text-white">ANATOMY GURU</h1>
             <p className="italic text-slate-400 text-sm tracking-wide">Nothing Left Undissected!!</p>
             
             <div className="mt-10 pt-6 border-t border-white/10">
               <h2 className="text-sm font-bold text-blue-400 uppercase tracking-widest mb-1">Examination Title</h2>
-              <p className="text-2xl font-semibold">{report.testTitle || 'Structured Medical Assessment'}</p>
+              <p className="text-2xl font-semibold text-white">{report.testTitle || 'Structured Medical Assessment'}</p>
               <p className="text-xs text-slate-400 mt-2 font-mono uppercase">Reference Date: {report.testDate || new Date().toLocaleDateString()}</p>
             </div>
           </div>
@@ -39,7 +38,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
             <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-1 rounded-2xl shadow-xl mb-4">
               <div className="bg-slate-900 px-6 py-4 rounded-[calc(1rem-2px)] text-center min-w-[140px]">
                 <span className="text-[10px] uppercase tracking-[0.3em] font-black block text-blue-400 mb-1">Aggregated Score</span>
-                <span className="text-4xl font-black">
+                <span className="text-4xl font-black text-white">
                   {report.totalScore}<span className="text-slate-500 text-xl mx-0.5">/</span>{report.maxScore}
                 </span>
                 <div className="h-1 w-full bg-slate-800 mt-3 rounded-full overflow-hidden">
@@ -51,22 +50,46 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               </div>
             </div>
 
-            {/* Summation Audit Result */}
-            {!audit.isCorrect && (
-              <div className="mb-4 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl text-left max-w-[200px] animate-pulse">
-                <div className="flex items-center gap-2 mb-1">
-                  <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
-                  <span className="text-[9px] uppercase font-black text-amber-500 tracking-wider">Summation Audit</span>
-                </div>
-                <p className="text-[10px] text-amber-200 leading-tight font-medium">
-                  Faculty noted <span className="font-bold">{audit.manualTotal}</span>, but individual marks sum to <span className="font-bold underline">{audit.calculatedTotal}</span>.
-                </p>
+            {/* Summation Audit Card */}
+            <div className={`mb-4 px-4 py-3 rounded-xl text-left min-w-[220px] border shadow-sm transition-all ${
+              audit.isCorrect 
+              ? 'bg-emerald-500/10 border-emerald-500/20' 
+              : 'bg-rose-500/10 border-rose-500/30 animate-pulse'
+            }`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                {audit.isCorrect ? (
+                  <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                ) : (
+                  <svg className="w-4 h-4 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
+                )}
+                <span className={`text-[10px] uppercase font-black tracking-wider ${audit.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  Summation Audit
+                </span>
               </div>
-            )}
+              
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] font-medium opacity-80">
+                  <span>Faculty Total:</span>
+                  <span className="font-bold">{audit.manualTotal}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-medium opacity-80">
+                  <span>Calculated Sum:</span>
+                  <span className={`font-bold ${!audit.isCorrect ? 'text-rose-400 underline decoration-2 underline-offset-2' : 'text-emerald-400'}`}>
+                    {audit.calculatedTotal}
+                  </span>
+                </div>
+              </div>
+              
+              {!audit.isCorrect && (
+                <p className="text-[10px] text-rose-200 mt-2 leading-tight font-semibold italic">
+                  ⚠ Error in manual summation detected.
+                </p>
+              )}
+            </div>
             
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-1">Student Credentials</p>
-              <p className="text-xl font-bold border-b-2 border-red-500/50 pb-1">{report.studentName}</p>
+            <div className="mt-2">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500 mb-1">Student Name</p>
+              <p className="text-xl font-bold border-b-2 border-red-500/50 pb-1 text-white inline-block">{report.studentName}</p>
             </div>
           </div>
         </div>
@@ -96,7 +119,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
                           {q.feedback}
                         </p>
                         {!q.isCorrect && (
-                          <span className="inline-block mt-2 text-[10px] uppercase font-black text-red-500 tracking-wider">Requires Revision</span>
+                          <span className="inline-block mt-2 text-[10px] uppercase font-black text-red-500 tracking-wider">Revision Advised</span>
                         )}
                       </div>
                     </div>
@@ -111,6 +134,21 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Audit Disclaimer if incorrect */}
+        {!audit.isCorrect && (
+          <div className="mb-12 bg-rose-50 border-l-4 border-rose-500 p-6 rounded-r-2xl">
+            <h4 className="text-rose-800 font-black text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
+              Mathematical Discrepancy Alert
+            </h4>
+            <p className="text-rose-700 text-sm leading-relaxed">
+              Our automated cross-check identified a mismatch in the manual score calculation. 
+              The individual question marks total <strong>{audit.calculatedTotal}</strong>, while the final score noted on the report is <strong>{audit.manualTotal}</strong>. 
+              Please verify this with the faculty evaluator to ensure administrative accuracy.
+            </p>
+          </div>
+        )}
 
         {/* Global Competency Metrics */}
         <div className="mt-16">
@@ -172,7 +210,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
         <div className="mt-20 pt-10 border-t border-slate-100 text-center">
           <div className="inline-block p-1 bg-slate-50 rounded-full mb-4">
              <div className="px-6 py-2 bg-white rounded-full text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] shadow-sm">
-                Generated via AnatomyGuru AI Evaluate v3.1
+                Verified via AnatomyGuru AI Math Auditor
              </div>
           </div>
           <p className="italic text-slate-500 text-sm">“Discipline beats motivation every day.”</p>
