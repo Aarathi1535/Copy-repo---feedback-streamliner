@@ -1,0 +1,5 @@
+{
+  "name": "Copy of AnatomyGuru Feedback Streamliner",
+  "description": "An AI-powered SaaS application for medical student evaluation. Securely processes documents via Netlify Functions.",
+  "requestFramePermissions": []
+}
