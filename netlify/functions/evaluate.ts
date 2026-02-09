@@ -20,27 +20,32 @@ export const handler = async (event: any) => {
     
     const systemInstruction = `
       You are the Master Medical Evaluator for Anatomy Guru.
-      Task: Generate a gold-standard academic feedback report (up to 100 marks).
       
-      CRITICAL: If textual data is provided, use it primarily. If base64 data is provided, it is a visual scan.
-      
-      RULES:
-      - Detail EVERY question found in Faculty Notes.
-      - 3-5 high-impact bullet points per question.
-      - Exact medical terminology.
-      - Marks must be exact integers.
-      - Output valid JSON only.
+      CORE OBJECTIVE:
+      You are transforming manual faculty notes into a professional digital feedback report. 
+      The marks are already decided by a human faculty member; your job is to extract them faithfully and provide the justification by comparing the student's answer to the expected medical standard.
+
+      INPUTS:
+      1. STUDENT ANSWER SHEET (SOURCE): Contains the actual medical answers written by the student.
+      2. FACULTY MANUAL FEEDBACK: Contains scrawled marks (e.g., "3/5", "8/10", "Mark: 4") and brief comments per question.
+
+      STRICT EVALUATION RULES:
+      - EXACT MARKS: Look at the Faculty Manual Feedback. Extract the EXACT marks assigned to each question number. DO NOT recalculate or invent new marks. If the notes say a student got 2 marks for Q1, you MUST report 2 marks.
+      - GAP ANALYSIS FEEDBACK: For every question, analyze the Student Answer Sheet. Identify exactly what was missing or what errors were made that led to the faculty deducting marks. 
+      - Provide 3-5 high-impact bullet points per question. These points must explain "What was missing from the student's answer" and "Key concepts to include next time".
+      - MEDICAL PRECISION: Always use professional anatomical and medical terminology.
+      - OUTPUT: Valid JSON only.
     `;
 
     // Priority handling: If text exists, we use it to avoid expensive vision processing on large papers.
-    const sourceParts: any[] = [{ text: "SOURCE DATA:" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET (SOURCE):" }];
     if (sourceDoc.text) {
       sourceParts.push({ text: sourceDoc.text });
     } else if (sourceDoc.base64) {
       sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
     }
 
-    const feedbackParts: any[] = [{ text: "FACULTY EVALUATION DATA:" }];
+    const feedbackParts: any[] = [{ text: "FACULTY MANUAL FEEDBACK (TRUTH FOR MARKS):" }];
     if (dirtyFeedbackDoc.text) {
       feedbackParts.push({ text: dirtyFeedbackDoc.text });
     } else if (dirtyFeedbackDoc.base64) {
@@ -48,13 +53,13 @@ export const handler = async (event: any) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash is essential for staying within Netlify's 26s execution window
+      model: "gemini-2.5-flash", 
       contents: [
         {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE COMPLETE STRUCTURED EVALUATION JSON." }
+            { text: "GENERATE COMPLETE STRUCTURED EVALUATION JSON BY EXTRACTING EXACT MARKS AND PERFORMING GAP ANALYSIS FEEDBACK." }
           ]
         }
       ],
@@ -69,7 +74,7 @@ export const handler = async (event: any) => {
             testTitle: { type: Type.STRING },
             testTopics: { type: Type.STRING },
             testDate: { type: Type.STRING },
-            totalScore: { type: Type.NUMBER },
+            totalScore: { type: Type.NUMBER, description: "Sum of exact marks extracted from faculty notes" },
             maxScore: { type: Type.NUMBER },
             questions: {
               type: Type.ARRAY,
@@ -77,8 +82,12 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  marks: { type: Type.NUMBER }
+                  feedbackPoints: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "3-5 points identifying gaps in student's answer vs perfection."
+                  },
+                  marks: { type: Type.NUMBER, description: "EXACT mark extracted from faculty evaluation truth." }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
               }
@@ -107,7 +116,7 @@ export const handler = async (event: any) => {
     return {
       statusCode: 500,
       body: JSON.stringify({ 
-        error: `AI Evaluation Error: ${error.message || "Unknown error"}. Try optimized PDFs for larger papers.` 
+        error: `AI Evaluation Error: ${error.message || "Unknown error"}. Ensure faculty notes are legible for mark extraction.` 
       }),
     };
   }
