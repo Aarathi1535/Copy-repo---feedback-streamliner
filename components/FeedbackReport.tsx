@@ -6,8 +6,8 @@ interface FeedbackReportProps {
 }
 
 const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
-  // Calculate the sum of marks from all questions
-  const calculatedSum = report.questions?.reduce((acc: number, q: any) => acc + (q.marks || 0), 0) || 0;
+  // Calculate the sum of marks from all questions (right-most column)
+  const calculatedSum = report.questions?.reduce((acc: number, q: any) => acc + (Number(q.marks) || 0), 0) || 0;
 
   return (
     <div className="max-w-[850px] mx-auto my-10 bg-white shadow-none rounded-none border border-slate-300 report-container p-4 sm:p-10 font-serif text-[#1e1e1e]">
@@ -44,10 +44,20 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
         </div>
       </div>
 
-      {/* Student Details Section */}
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-red-600 font-black text-lg">Student Name: </span>
-        <span className="text-[#1e1e1e] font-black text-lg border-b-2 border-red-600 px-2 min-w-[100px]">{report.studentName}</span>
+      {/* Student Details & Total Marks Summary Section */}
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b-2 border-slate-100 pb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-red-600 font-black text-lg">Student Name: </span>
+          <span className="text-[#1e1e1e] font-black text-lg border-b-2 border-red-600 px-2 min-w-[100px]">{report.studentName}</span>
+        </div>
+        
+        {/* Prominent Total Marks Box */}
+        <div className="bg-red-50 border-2 border-red-600 p-3 rounded-lg text-center min-w-[140px] shadow-sm">
+          <div className="text-[10px] font-black text-red-600 uppercase tracking-tighter mb-1">Total Marks Obtained</div>
+          <div className="text-2xl font-black text-red-700 leading-none">
+            {calculatedSum} <span className="text-slate-400 text-sm font-bold">/ {report.maxScore || report.totalScore || 100}</span>
+          </div>
+        </div>
       </div>
 
       {/* Evaluation Table */}
@@ -76,13 +86,13 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
                 <td className="p-4 text-center font-bold text-base align-top">{q.marks}</td>
               </tr>
             ))}
-            {/* Total Marks Row */}
-            <tr className="bg-slate-50 border-t-2 border-slate-800">
-              <td colSpan={2} className="p-4 border-r-2 border-slate-800 text-right text-red-600 font-black text-lg uppercase tracking-widest">
-                Total Marks Obtained
+            {/* Table Footer Summation */}
+            <tr className="bg-slate-50 border-t-2 border-slate-800 font-black">
+              <td colSpan={2} className="p-4 border-r-2 border-slate-800 text-right text-red-600 text-lg uppercase tracking-widest">
+                Sum of Question Marks
               </td>
-              <td className="p-4 text-center font-black text-xl bg-red-50 text-red-700">
-                {calculatedSum} <span className="text-slate-400 text-sm">/ {report.maxScore || report.totalScore}</span>
+              <td className="p-4 text-center text-xl text-red-700 bg-red-50/50">
+                {calculatedSum}
               </td>
             </tr>
           </tbody>
@@ -92,9 +102,9 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
       {/* Footer Details */}
       <div className="mt-6 flex justify-between items-center text-[12px] font-bold text-slate-500 uppercase tracking-wider border-t border-slate-200 pt-4">
         <div className="flex items-center gap-4">
-          <span>Anatomy Guru Evaluate v4.5</span>
+          <span>Anatomy Guru Evaluate v4.6</span>
           <span className="text-slate-300">|</span>
-          <span>Verified Response Matrix</span>
+          <span>Official Verification System</span>
         </div>
         <div>Page 1 of 1</div>
       </div>
