@@ -28,18 +28,18 @@ export const handler = async (event: any) => {
       STRICT EVALUATION RULES:
       - MARKS: Extract EXACT marks from Faculty Notes. Never invent them.
       - UNATTEMPTED QUESTIONS: Identify questions with 0 marks or those not present in the student answer sheet as "NOT ATTEMPTED".
+      - FEEDBACK FOR UNATTEMPTED: For questions not attempted, you MUST still provide a entry in the 'questions' array. Use the 'feedbackPoints' to specify what the student missed based on the Question Paper/Answer Key.
       
       MCQ SPECIAL INSTRUCTION:
-      - For Multiple Choice Questions (MCQs): If the student's answer is incorrect (marks deducted), you MUST skim the Question Paper and Answer Key provided in the documents to identify the correct option.
-      - The feedback for that specific question MUST explicitly state the correct answer (e.g., "Correct option: C - Subclavian Artery").
+      - For Multiple Choice Questions (MCQs): If the student's answer is incorrect, explicitly state the correct option in the feedback list (e.g., "Correct option: B - Axillary Nerve").
       
       GENERAL FEEDBACK REQUIREMENTS:
-      1. OVERALL PERFORMANCE: A professional, supportive summary of the entire paper.
-      2. SECTION ANALYSIS: Categorize questions into MCQs, Short Answers, and Long Essays. Provide a trend analysis for each group.
-      3. STRENGTHS/WEAKNESSES: Identify recurring medical/conceptual strengths and recurring knowledge gaps.
-      4. REPEATING TRENDS: Mention habits (e.g., "Poor labeling in diagrams", "Vague clinical correlates", "Good structural terminology").
-      5. UNATTEMPTED ADVICE: For every skipped question, give brief advice on "How to write" (structure) and "What to write" (key facts).
-      6. MOTIVATION: End with an inspiring, anatomical-themed motivational sentence.
+      1. OVERALL PERFORMANCE: A professional, supportive summary.
+      2. SECTION ANALYSIS: Trends for MCQs, Short Answers, and Long Essays.
+      3. STRENGTHS/WEAKNESSES: Recurring conceptual strengths and gaps.
+      4. REPEATING TRENDS: Mention habits (e.g., "Incomplete diagram labeling", "Strong clinical correlates").
+      5. UNATTEMPTED ADVICE: Specific recovery plan for skipped questions.
+      6. MOTIVATION: anatomical-themed motivational sentence.
 
       OUTPUT: Valid JSON only.
     `;
@@ -59,7 +59,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE STRUCTURED EVALUATION JSON. Ensure MCQ corrections are accurate based on the provided answer key." }
+            { text: "GENERATE STRUCTURED EVALUATION JSON. Ensure every question from the faculty list is accounted for, including unattempted ones with detailed missed-fact feedback." }
           ]
         }
       ],
@@ -82,7 +82,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Bullet points explaining performance or missed content." },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
@@ -103,21 +103,21 @@ export const handler = async (event: any) => {
                 },
                 strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
                 weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-                repeatingTrends: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Habitual patterns found in the paper." },
+                repeatingTrends: { type: Type.ARRAY, items: { type: Type.STRING } },
                 unattemptedAdvice: {
                   type: Type.ARRAY,
                   items: {
                     type: Type.OBJECT,
                     properties: {
                       qNo: { type: Type.STRING },
-                      advice: { type: Type.STRING, description: "Advice on how to write and what facts were missing." }
+                      advice: { type: Type.STRING }
                     },
                     required: ["qNo", "advice"]
                   }
                 },
                 closingMotivation: { type: Type.STRING }
               },
-              required: ["overallPerformance", "sectionAnalysis", "strengths", "weaknesses", "unattemptedAdvice", "closingMotivation"]
+              required: ["overallPerformance", "sectionAnalysis", "strengths", "weaknesses", "repeatingTrends", "unattemptedAdvice", "closingMotivation"]
             }
           },
           required: ["studentName", "testTitle", "questions", "generalFeedback"]
