@@ -44,7 +44,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
       <div className="flex flex-col items-center mb-8 no-print">
         <div className="flex items-center justify-center gap-6">
           <div className="relative w-32 h-32 flex items-center justify-center">
-            <svg viewBox="0 0 100 100" className="w-full h-full">
+            {/* <svg viewBox="0 0 100 100" className="w-full h-full">
               <path d="M40 30 C25 30 15 40 15 55 C15 70 25 80 30 85 V93 H50 V85 C55 80 65 70 65 55 C65 40 55 30 40 30 Z" fill="#f8fafc" stroke="#1e1e1e" strokeWidth="1.5"/>
               <circle cx="32" cy="55" r="5" fill="#1e1e1e" />
               <circle cx="48" cy="55" r="5" fill="#1e1e1e" />
@@ -54,7 +54,12 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               <path d="M25 55 V62 C25 62 40 66 55 62 V55" fill="#1e1e1e" />
               <path d="M68 48 V62" stroke="#f59e0b" strokeWidth="2" />
               <circle cx="68" cy="62" r="3" fill="#f59e0b" />
-            </svg>
+            </svg> */}
+             <img
+               src="/logo.png"
+               alt="Anatomy Guru Logo"
+               className="w-full h-full object-contain"
+              />
           </div>
           
           <div className="text-left border-l-2 border-slate-900 pl-6">
