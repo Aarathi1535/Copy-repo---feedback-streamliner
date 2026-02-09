@@ -48,7 +48,7 @@ export const handler = async (event: any) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash is essential for staying within Netlify's 26s execution window
+      model: "gemini-2.5-flash", // Updated from gemini-3-flash-preview to gemini-2.5-flash
       contents: [
         {
           parts: [
