@@ -6,6 +6,9 @@ interface FeedbackReportProps {
 }
 
 const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
+  // Calculate the sum of marks from all questions
+  const calculatedSum = report.questions?.reduce((acc: number, q: any) => acc + (q.marks || 0), 0) || 0;
+
   return (
     <div className="max-w-[850px] mx-auto my-10 bg-white shadow-none rounded-none border border-slate-300 report-container p-4 sm:p-10 font-serif text-[#1e1e1e]">
       {/* Brand Header */}
@@ -59,7 +62,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
           </thead>
           <tbody>
             {report.questions?.map((q: any, idx: number) => (
-              <tr key={idx} className="border-b border-slate-400 last:border-0">
+              <tr key={idx} className="border-b border-slate-400">
                 <td className="p-4 border-r-2 border-slate-800 text-center font-bold text-base align-top">{q.qNo}</td>
                 <td className="p-4 border-r-2 border-slate-800 align-top">
                   <ul className="list-disc pl-6 space-y-2">
@@ -73,6 +76,15 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
                 <td className="p-4 text-center font-bold text-base align-top">{q.marks}</td>
               </tr>
             ))}
+            {/* Total Marks Row */}
+            <tr className="bg-slate-50 border-t-2 border-slate-800">
+              <td colSpan={2} className="p-4 border-r-2 border-slate-800 text-right text-red-600 font-black text-lg uppercase tracking-widest">
+                Total Marks Obtained
+              </td>
+              <td className="p-4 text-center font-black text-xl bg-red-50 text-red-700">
+                {calculatedSum} <span className="text-slate-400 text-sm">/ {report.maxScore || report.totalScore}</span>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -80,7 +92,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
       {/* Footer Details */}
       <div className="mt-6 flex justify-between items-center text-[12px] font-bold text-slate-500 uppercase tracking-wider border-t border-slate-200 pt-4">
         <div className="flex items-center gap-4">
-          <span>Anatomy Guru Evaluate v4.2</span>
+          <span>Anatomy Guru Evaluate v4.5</span>
           <span className="text-slate-300">|</span>
           <span>Verified Response Matrix</span>
         </div>
