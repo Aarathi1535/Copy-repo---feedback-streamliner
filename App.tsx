@@ -7,10 +7,17 @@ import FeedbackReport from './components/FeedbackReport';
 // @ts-ignore
 import mammoth from 'mammoth';
 // @ts-ignore
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Safe resolution of PDF.js object for different ESM environments
+const pdfjs: any = (pdfjsLib as any).GlobalWorkerOptions 
+  ? pdfjsLib 
+  : (pdfjsLib as any).default || pdfjsLib;
 
 // Set up PDF.js worker using a compatible CDN for v3.11.174
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+if (pdfjs && pdfjs.GlobalWorkerOptions) {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+}
 
 const App: React.FC = () => {
   const [sourceDoc, setSourceDoc] = useState<File | null>(null);
@@ -26,6 +33,9 @@ const App: React.FC = () => {
   }, [report]);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
+    if (!pdfjs || !pdfjs.getDocument) {
+      throw new Error("PDF.js library not properly initialized.");
+    }
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
@@ -223,7 +233,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.2</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.3</p>
       </footer>
     </div>
   );
