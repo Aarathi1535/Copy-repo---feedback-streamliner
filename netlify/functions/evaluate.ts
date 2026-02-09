@@ -29,6 +29,10 @@ export const handler = async (event: any) => {
       - MARKS: Extract EXACT marks from Faculty Notes. Never invent them.
       - UNATTEMPTED QUESTIONS: Identify questions with 0 marks or those not present in the student answer sheet as "NOT ATTEMPTED".
       
+      MCQ SPECIAL INSTRUCTION:
+      - For Multiple Choice Questions (MCQs): If the student's answer is incorrect (marks deducted), you MUST skim the Question Paper and Answer Key provided in the documents to identify the correct option.
+      - The feedback for that specific question MUST explicitly state the correct answer (e.g., "Correct option: C - Subclavian Artery").
+      
       GENERAL FEEDBACK REQUIREMENTS:
       1. OVERALL PERFORMANCE: A professional, supportive summary of the entire paper.
       2. SECTION ANALYSIS: Categorize questions into MCQs, Short Answers, and Long Essays. Provide a trend analysis for each group.
@@ -40,11 +44,11 @@ export const handler = async (event: any) => {
       OUTPUT: Valid JSON only.
     `;
 
-    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET:" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET + QUESTION PAPER SOURCE:" }];
     if (sourceDoc.text) sourceParts.push({ text: sourceDoc.text });
     else if (sourceDoc.base64) sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
 
-    const feedbackParts: any[] = [{ text: "FACULTY MARKS (GROUND TRUTH):" }];
+    const feedbackParts: any[] = [{ text: "FACULTY MARKS + ANSWER KEY (GROUND TRUTH):" }];
     if (dirtyFeedbackDoc.text) feedbackParts.push({ text: dirtyFeedbackDoc.text });
     else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
@@ -55,7 +59,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE STRUCTURED EVALUATION JSON. Prioritize sectional trends and unattempted recovery advice." }
+            { text: "GENERATE STRUCTURED EVALUATION JSON. Ensure MCQ corrections are accurate based on the provided answer key." }
           ]
         }
       ],
