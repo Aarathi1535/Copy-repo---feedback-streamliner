@@ -23,23 +23,26 @@ export const handler = async (event: any) => {
       
       CORE OBJECTIVE:
       Digitize faculty marks and perform a professional medical knowledge gap analysis.
-      You MUST provide deep insight into the student's performance trends.
-
-      STRICT EVALUATION RULES:
-      - MARKS: Extract EXACT marks from Faculty Notes. Never invent them.
-      - UNATTEMPTED QUESTIONS: Identify questions with 0 marks or those not present in the student answer sheet as "NOT ATTEMPTED".
-      - FEEDBACK FOR UNATTEMPTED: For questions not attempted, you MUST still provide a entry in the 'questions' array. Use the 'feedbackPoints' to specify what the student missed based on the Question Paper/Answer Key.
+      
+      STRICT SCORE RULE:
+      - YOU MUST EXTRACT THE MARKS EXACTLY FROM THE "FACULTY MARKS" DOCUMENT. 
+      - DO NOT ASSUME OR ESTIMATE SCORES. 
+      - IF A QUESTION HAS A SCORE WRITTEN NEXT TO IT IN THE FACULTY NOTES, RECORD THAT SCORE EXACTLY.
+      
+      UNATTEMPTED QUESTIONS LOGIC:
+      - If a question has 0 marks or is explicitly noted as not attempted in the faculty notes, mark it as 0.
+      - FOR UNATTEMPTED QUESTIONS: You must still provide specific feedback in the main table. Instead of saying "not attempted", skim the Answer Key and Student Answer Sheet to explain exactly what core anatomical concepts or facts the student missed out on by not answering this question.
       
       MCQ SPECIAL INSTRUCTION:
-      - For Multiple Choice Questions (MCQs): If the student's answer is incorrect, explicitly state the correct option in the feedback list (e.g., "Correct option: B - Axillary Nerve").
+      - For MCQs: If the student got it wrong, state the correct option from the answer key (e.g., "Correct option: A - Brachial Plexus").
       
       GENERAL FEEDBACK REQUIREMENTS:
-      1. OVERALL PERFORMANCE: A professional, supportive summary.
+      1. OVERALL PERFORMANCE: A professional summary.
       2. SECTION ANALYSIS: Trends for MCQs, Short Answers, and Long Essays.
-      3. STRENGTHS/WEAKNESSES: Recurring conceptual strengths and gaps.
-      4. REPEATING TRENDS: Mention habits (e.g., "Incomplete diagram labeling", "Strong clinical correlates").
+      3. STRENGTHS/WEAKNESSES: Specific anatomical knowledge gaps found.
+      4. REPEATING TRENDS: Mention habits (e.g., "Inconsistent labeling", "Good clinical terminology").
       5. UNATTEMPTED ADVICE: Specific recovery plan for skipped questions.
-      6. MOTIVATION: anatomical-themed motivational sentence.
+      6. MOTIVATION: Anatomical-themed motivational sentence.
 
       OUTPUT: Valid JSON only.
     `;
@@ -59,7 +62,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE STRUCTURED EVALUATION JSON. Ensure every question from the faculty list is accounted for, including unattempted ones with detailed missed-fact feedback." }
+            { text: "GENERATE EVALUATION JSON. Prioritize EXACT marks extraction from the faculty notes. Every question in the test must have an entry, even if unattempted." }
           ]
         }
       ],
@@ -82,7 +85,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Bullet points explaining performance or missed content." },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific facts missed or performance notes." },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
