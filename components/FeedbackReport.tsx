@@ -56,13 +56,13 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               <circle cx="68" cy="62" r="3" fill="#f59e0b" />
             </svg> */}
              <img
-               src="/logo.png"
+               src="/logo.jpg"
                alt="Anatomy Guru Logo"
                className="w-full h-full object-contain"
               />
           </div>
           
-          <div className="text-left border-l-2 border-slate-900 pl-6">
+          {/* <div className="text-left border-l-2 border-slate-900 pl-6">
             <div className="flex items-end gap-1 mb-1 leading-none">
               <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">
                 ANATOMY <span className="text-orange-500">GURU</span>
@@ -77,7 +77,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
                 <rect x="80" y="8" width="40" height="4" fill="white" opacity="0.3" rx="1" />
               </svg>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
