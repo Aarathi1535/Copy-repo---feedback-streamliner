@@ -125,7 +125,17 @@ const App: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    window.print();
+    if (sourceDoc) {
+      const originalTitle = document.title;
+      // Remove original extension and use the filename for the export
+      const baseName = sourceDoc.name.replace(/\.[^/.]+$/, "");
+      document.title = `Evaluation_${baseName}`;
+      window.print();
+      // Restore original title so the UI doesn't look weird afterwards
+      document.title = originalTitle;
+    } else {
+      window.print();
+    }
   };
 
   const renderDashboard = () => (
@@ -233,7 +243,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.3</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.4</p>
       </footer>
     </div>
   );
