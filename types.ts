@@ -5,9 +5,23 @@ export interface QuestionFeedback {
   marks: number;
 }
 
+export interface UnattemptedAdvice {
+  qNo: string;
+  advice: string;
+}
+
 export interface GeneralFeedbackSection {
   overallPerformance: string;
-  actionPoints: string[];
+  sectionAnalysis: {
+    mcqs: string;
+    shortAnswers: string;
+    longEssays: string;
+  };
+  strengths: string[];
+  weaknesses: string[];
+  repeatingTrends: string[];
+  unattemptedAdvice: UnattemptedAdvice[];
+  closingMotivation: string;
 }
 
 export interface EvaluationReport {

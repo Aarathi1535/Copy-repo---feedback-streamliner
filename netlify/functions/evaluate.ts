@@ -12,7 +12,7 @@ export const handler = async (event: any) => {
     if (!process.env.API_KEY) {
       return { 
         statusCode: 500, 
-        body: JSON.stringify({ error: "API Key missing in environment." }) 
+        body: JSON.stringify({ error: "API Key missing." }) 
       };
     }
 
@@ -22,39 +22,31 @@ export const handler = async (event: any) => {
       You are the Master Medical Evaluator for Anatomy Guru.
       
       CORE OBJECTIVE:
-      You are transforming manual faculty marks into a professional digital feedback report.
-      You MUST perform a deep "Gap Analysis" by comparing the student's answer sheet to the faculty's final decision.
-
-      INPUTS:
-      1. STUDENT ANSWER SHEET (SOURCE): The student's written response.
-      2. FACULTY MANUAL FEEDBACK: The evaluator's marks (e.g. 3/5, 8/10, etc) and scrawled notes.
+      Digitize faculty marks and perform a professional medical knowledge gap analysis.
+      You MUST provide deep insight into the student's performance trends.
 
       STRICT EVALUATION RULES:
-      - EXACT MARKS: Look at the Faculty Manual Feedback. Extract the EXACT marks assigned to each question. DO NOT recalculate or "improve" the grade. If the teacher gave 2/5, the JSON MUST reflect 2.
-      - UNATTEMPTED QUESTIONS: If a question number appears in the mark sheet with 0 marks, or if it is missing from the student answer sheet, identify it as "NOT ATTEMPTED".
-      - GAP ANALYSIS FEEDBACK: 
-          * For questions with lost marks: Identify precisely what medical facts, diagrams, or explanations were missing from the student's sheet.
-          * For correct answers: Acknowledge the strength (e.g., "Excellent anatomical detail").
-          * Use 3-5 specific bullet points per question.
-      - COLOR HINTS: For feedback that represents a correct answer or strength, ensure the tone is positive. For gaps or unattempted questions, focus on "Missing concepts" or "Not attempted".
-      - PROFESSIONALISM: Use high-level medical and anatomical terminology only.
+      - MARKS: Extract EXACT marks from Faculty Notes. Never invent them.
+      - UNATTEMPTED QUESTIONS: Identify questions with 0 marks or those not present in the student answer sheet as "NOT ATTEMPTED".
       
-      OUTPUT FORMAT: Valid JSON only.
+      GENERAL FEEDBACK REQUIREMENTS:
+      1. OVERALL PERFORMANCE: A professional, supportive summary of the entire paper.
+      2. SECTION ANALYSIS: Categorize questions into MCQs, Short Answers, and Long Essays. Provide a trend analysis for each group.
+      3. STRENGTHS/WEAKNESSES: Identify recurring medical/conceptual strengths and recurring knowledge gaps.
+      4. REPEATING TRENDS: Mention habits (e.g., "Poor labeling in diagrams", "Vague clinical correlates", "Good structural terminology").
+      5. UNATTEMPTED ADVICE: For every skipped question, give brief advice on "How to write" (structure) and "What to write" (key facts).
+      6. MOTIVATION: End with an inspiring, anatomical-themed motivational sentence.
+
+      OUTPUT: Valid JSON only.
     `;
 
     const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET:" }];
-    if (sourceDoc.text) {
-      sourceParts.push({ text: sourceDoc.text });
-    } else if (sourceDoc.base64) {
-      sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
-    }
+    if (sourceDoc.text) sourceParts.push({ text: sourceDoc.text });
+    else if (sourceDoc.base64) sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
 
     const feedbackParts: any[] = [{ text: "FACULTY MARKS (GROUND TRUTH):" }];
-    if (dirtyFeedbackDoc.text) {
-      feedbackParts.push({ text: dirtyFeedbackDoc.text });
-    } else if (dirtyFeedbackDoc.base64) {
-      feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
-    }
+    if (dirtyFeedbackDoc.text) feedbackParts.push({ text: dirtyFeedbackDoc.text });
+    else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash", 
@@ -63,7 +55,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE FULL STRUCTURED EVALUATION JSON. Ensure marks are exact integers extracted from the notes." }
+            { text: "GENERATE STRUCTURED EVALUATION JSON. Prioritize sectional trends and unattempted recovery advice." }
           ]
         }
       ],
@@ -86,11 +78,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { 
-                    type: Type.ARRAY, 
-                    items: { type: Type.STRING },
-                    description: "Feedback bullets. Mention 'NOT ATTEMPTED' clearly if applicable."
-                  },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
@@ -99,10 +87,33 @@ export const handler = async (event: any) => {
             generalFeedback: {
               type: Type.OBJECT,
               properties: {
-                overallPerformance: { type: Type.STRING, description: "Professional summary paragraph." },
-                actionPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific improvement steps." }
+                overallPerformance: { type: Type.STRING },
+                sectionAnalysis: {
+                  type: Type.OBJECT,
+                  properties: {
+                    mcqs: { type: Type.STRING },
+                    shortAnswers: { type: Type.STRING },
+                    longEssays: { type: Type.STRING }
+                  },
+                  required: ["mcqs", "shortAnswers", "longEssays"]
+                },
+                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+                repeatingTrends: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Habitual patterns found in the paper." },
+                unattemptedAdvice: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      qNo: { type: Type.STRING },
+                      advice: { type: Type.STRING, description: "Advice on how to write and what facts were missing." }
+                    },
+                    required: ["qNo", "advice"]
+                  }
+                },
+                closingMotivation: { type: Type.STRING }
               },
-              required: ["overallPerformance", "actionPoints"]
+              required: ["overallPerformance", "sectionAnalysis", "strengths", "weaknesses", "unattemptedAdvice", "closingMotivation"]
             }
           },
           required: ["studentName", "testTitle", "questions", "generalFeedback"]
@@ -119,7 +130,7 @@ export const handler = async (event: any) => {
     console.error("Evaluation Function Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: `AI Error: ${error.message || "Unknown error"}.` }),
+      body: JSON.stringify({ error: `AI Processing Failure: ${error.message || "Unknown error"}.` }),
     };
   }
 };
