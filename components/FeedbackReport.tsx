@@ -40,7 +40,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
   return (
     <div className="max-w-[850px] mx-auto my-10 bg-white shadow-none rounded-none border border-slate-300 report-container p-6 sm:p-12 text-[#1e1e1e]" style={reportStyle}>
       
-      {/* Brand Header */}
+      {/* Brand Header - High Fidelity Logo Reconstruction */}
       <div className="flex flex-col items-center mb-8 no-print">
         <div className="flex items-center justify-center gap-6">
           <div className="relative w-32 h-32 flex items-center justify-center">

@@ -19,61 +19,56 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are the Master Medical Evaluator for Anatomy Guru. Your goal is to provide deep, surgical precision in feedback.
+      You are the "Anatomy Guru Master Evaluator". Your feedback must be "dissected" with medical precision.
       
       CORE OBJECTIVE:
       Digitize faculty marks and perform a professional medical knowledge gap analysis.
       
       STRICT SCORE RULE:
-      - YOU MUST EXTRACT THE MARKS EXACTLY FROM THE "FACULTY MARKS" (Feedback Doc). 
-      - DO NOT ASSUME OR ESTIMATE SCORES. 
-      - IF A QUESTION HAS A SCORE WRITTEN NEXT TO IT IN THE FACULTY NOTES, RECORD THAT SCORE EXACTLY.
+      - EXTRACT MARKS EXACTLY from the "FACULTY MARKS" (Feedback Doc). 
+      - If a score is written next to a question in the faculty notes, use that EXACT number.
+      - DO NOT calculate or guess scores unless the faculty note is a sum of parts.
       
-      ELABORATIVE FEEDBACK RULES (MASTER EVALUATOR TONE):
-      - AVOID GENERIC COMMENTS: Never say "Incomplete", "Write fully", "Good job", or "Attempt better".
-      - USE ANATOMICAL SPECIFICS: Instead of "write fully", say "Missed the precise origin of the pectoralis minor from the 3rd, 4th, and 5th ribs" or "Failed to mention the clinical significance of the axillary nerve in surgical neck fractures".
-      - STRUCTURED INSIGHT: Every feedback point must provide value. Mention missing diagrams, incomplete labeling, lack of clinical correlates, or errors in anatomical relations.
+      ELABORATIVE FEEDBACK (THE APPRECIATED STYLE):
+      - NO GENERIC COMMENTS: Never use "incomplete", "write more", or "improve diagrams".
+      - ANATOMICAL DEPTH: Use specific terminology. 
+        - Bad: "Diagram is incomplete."
+        - Good (Appreciated): "The schematic of the Brachial Plexus missed the posterior cord's contribution to the axillary nerve, a critical surgical landmark for shoulder dislocations."
+        - Good (Appreciated): "While the muscle group was identified, you failed to specify the 'double nerve supply' of the Pectineus muscle (Femoral and Obturator nerves)."
+      - CLINICAL RELEVANCE: Link errors to clinical outcomes where possible (e.g., surgical risks, nerve palsies).
       
-      UNATTEMPTED QUESTIONS LOGIC:
-      - If a question has 0 marks or is explicitly noted as not attempted, mark it as 0.
-      - FOR UNATTEMPTED QUESTIONS: You MUST still provide specific, detailed feedback in the main table. Skim the Answer Key/Question Paper and describe exactly what high-yield anatomical facts the student missed out on (e.g., "Missed critical marks regarding the Boundaries and Contents of the Femoral Triangle").
+      UNATTEMPTED QUESTIONS:
+      - If marks are 0 or noted as skipped, record 0.
+      - For the feedback, do not just say "Not attempted". Skim the Answer Key and provide a bulleted list of the HIGH-YIELD concepts the student missed (e.g., "Missed critical marks for the course of the Ulnar nerve through the Canal of Guyon").
       
       MCQ SPECIAL INSTRUCTION:
-      - For MCQs: If the student got it wrong, state the correct option from the answer key AND a 1-sentence anatomical reason why (e.g., "Correct option: A - Long Thoracic Nerve. This nerve is uniquely vulnerable during radical mastectomy as it lies on the serratus anterior.").
+      - State the correct option AND the anatomical rationale (e.g., "Correct option: C - Median Nerve. This nerve is the only one passing through the carpal tunnel under the flexor retinaculum.").
       
-      GENERAL FEEDBACK REQUIREMENTS:
-      1. OVERALL PERFORMANCE: A deep, professional medical analysis.
-      2. SECTION ANALYSIS: Deep trends (e.g., "Strong in gross anatomy but weak in clinical correlates").
-      3. STRENGTHS/WEAKNESSES: Specific anatomical knowledge gaps found.
-      4. REPEATING TRENDS: Mention habits like "Inconsistent shading in diagrams" or "Strong use of mnemonics".
-      5. UNATTEMPTED ADVICE: Recovery strategy.
-      6. MOTIVATION: Anatomical-themed sentence.
-
       OUTPUT: Valid JSON only.
     `;
 
-    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET + QUESTION PAPER SOURCE:" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET:" }];
     if (sourceDoc.text) sourceParts.push({ text: sourceDoc.text });
     else if (sourceDoc.base64) sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
 
-    const feedbackParts: any[] = [{ text: "FACULTY MARKS + ANSWER KEY (GROUND TRUTH):" }];
+    const feedbackParts: any[] = [{ text: "FACULTY NOTES + ANSWER KEY:" }];
     if (dirtyFeedbackDoc.text) feedbackParts.push({ text: dirtyFeedbackDoc.text });
     else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", 
+      model: "gemini-3-flash-preview", 
       contents: [
         {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE ELABORATIVE EVALUATION JSON. Prioritize EXACT marks extraction. Every question must have detailed, terminologically-rich bulleted feedback." }
+            { text: "GENERATE ELABORATIVE EVALUATION JSON. Ensure marks are identical to faculty notes. Every feedback point must be medically descriptive and specific." }
           ]
         }
       ],
       config: {
         systemInstruction,
-        temperature: 0.1,
+        temperature: 0.2,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -90,7 +85,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Medically specific, elaborative anatomical facts missed or notes." },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Medically specific, elaborative anatomical insights." },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
