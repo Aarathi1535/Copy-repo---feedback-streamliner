@@ -106,7 +106,7 @@ const App: React.FC = () => {
       const sourceData = await processFile(sourceDoc);
       const feedbackData = await processFile(dirtyFeedbackDoc);
 
-      setLoadingStep("AI performing gap analysis...");
+      setLoadingStep("AI analyzing paper structure...");
       const result = await generateStructuredFeedback(sourceData, feedbackData);
       setReport(result);
     } catch (err: any) {
@@ -125,17 +125,7 @@ const App: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    if (sourceDoc) {
-      const originalTitle = document.title;
-      // Strip original extension to use the source filename for the PDF export suggestion
-      const baseName = sourceDoc.name.replace(/\.[^/.]+$/, "");
-      document.title = `Evaluation_${baseName}`;
-      window.print();
-      // Restore original title
-      document.title = originalTitle;
-    } else {
-      window.print();
-    }
+    window.print();
   };
 
   const renderDashboard = () => (
@@ -243,7 +233,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.5</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.3</p>
       </footer>
     </div>
   );
