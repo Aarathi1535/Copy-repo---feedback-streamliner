@@ -33,6 +33,11 @@ const App: React.FC = () => {
     } else {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
+        // Use reader.readAsDataURL for small to medium files
+        // Netlify Functions have a 6MB limit. If file > 4MB base64, warn user.
+        if (file.size > 5 * 1024 * 1024) {
+          reject(new Error("File too large. Please upload documents under 5MB for processing."));
+        }
         reader.readAsDataURL(file);
         reader.onload = () => resolve((reader.result as string).split(',')[1]);
         reader.onerror = reject;
@@ -48,7 +53,7 @@ const App: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!sourceDoc || !dirtyFeedbackDoc) {
-      setError("Document verification failed. Please ensure both files are uploaded.");
+      setError("Please ensure both 'Source Document' and 'Faculty Notes' are uploaded.");
       return;
     }
 
@@ -62,8 +67,14 @@ const App: React.FC = () => {
       const result = await generateStructuredFeedback(sourceData, feedbackData);
       setReport(result);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Engine Error: Could not parse medical context. If using complex Word formatting, try PDF.");
+      console.error("Analysis Error Details:", err);
+      if (err.message.includes("404")) {
+        setError("Deployment Error: Evaluation engine endpoint not found. Please verify Netlify Function status.");
+      } else if (err.message.includes("large")) {
+        setError(err.message);
+      } else {
+        setError("Evaluation failed. This usually occurs with very large documents or server timeouts. Try converting images to a single PDF.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +84,7 @@ const App: React.FC = () => {
     if (sourceDoc) {
       const originalTitle = document.title;
       const fileNameWithoutExt = sourceDoc.name.replace(/\.[^/.]+$/, "");
-      document.title = `Evaluation_${fileNameWithoutExt}`;
+      document.title = `AnatomyGuru_Report_${fileNameWithoutExt}`;
       window.print();
       setTimeout(() => {
         document.title = originalTitle;
@@ -87,24 +98,24 @@ const App: React.FC = () => {
     <div className="max-w-5xl mx-auto px-4 mt-12 animate-fade-in pb-20">
       <header className="text-center mb-16">
         <h1 className="text-5xl font-black text-slate-900 mb-4 tracking-tighter">
-          Dissection <span className="gradient-text">Center</span>
+          Analysis <span className="gradient-text">Engine</span>
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-          Upload your medical exam source documents and manual evaluator notes to generate a gold-standard feedback report.
+          Deep-dive analysis of student performance. Connect gaps between student answers and evaluator expectations.
         </p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 h-full">
         <FileUploader
           label="Source Document"
-          description="QP + Key + Student Answers (PDF, Docx, or Images)"
+          description="Question Paper + Student Answer Sheets"
           onFileSelect={setSourceDoc}
           selectedFile={sourceDoc}
           icon={<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>}
         />
         <FileUploader
-          label="Evaluator's Notes"
-          description="Messy feedback & marks (PDF, Docx, or Images)"
+          label="Faculty Notes"
+          description="Messy marks & manual evaluator comments"
           onFileSelect={setDirtyFeedbackDoc}
           selectedFile={dirtyFeedbackDoc}
           icon={<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>}
@@ -112,11 +123,14 @@ const App: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-600 p-6 rounded-2xl mb-8 text-sm flex items-center gap-4 animate-shake">
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 p-6 rounded-2xl mb-8 text-sm flex items-start gap-4 animate-shake shadow-lg shadow-rose-500/10">
           <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center shrink-0">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
           </div>
-          <span className="font-semibold">{error}</span>
+          <div>
+            <p className="font-black uppercase tracking-widest text-[10px] mb-1">Error Notification</p>
+            <span className="font-semibold text-base">{error}</span>
+          </div>
         </div>
       )}
 
@@ -126,18 +140,18 @@ const App: React.FC = () => {
         className={`w-full py-6 rounded-2xl font-black text-xl shadow-2xl transition-all flex items-center justify-center gap-3 relative overflow-hidden ${
           isLoading 
           ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-          : 'bg-slate-900 hover:bg-slate-800 text-white hover:-translate-y-1'
+          : 'bg-slate-900 hover:bg-slate-800 text-white hover:-translate-y-1 active:scale-95'
         }`}
       >
         {isLoading ? (
           <div className="flex items-center gap-4">
             <svg className="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <span className="animate-pulse">Synthesizing Feedback...</span>
+            <span className="animate-pulse tracking-widest uppercase text-sm">Performing Gap Analysis...</span>
           </div>
         ) : (
           <>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Generate Structured Report
+            Synthesize AnatomyGuru Report
           </>
         )}
       </button>
@@ -145,8 +159,8 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#fcfcfd]">
-      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50 no-print h-20">
+    <div className="min-h-screen bg-[#f8f9fa]">
+      <nav className="bg-white/90 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-50 no-print h-20">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group"
@@ -155,33 +169,21 @@ const App: React.FC = () => {
               setView('dashboard');
             }}
           >
-            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl group-hover:rotate-6 transition-transform">A</div>
+            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl group-hover:rotate-12 transition-all">A</div>
             <div>
               <span className="brand-font text-2xl font-black tracking-tighter text-slate-900 block leading-none">AnatomyGuru</span>
-              <span className="text-[10px] uppercase font-black text-blue-600 tracking-widest leading-none">Evaluation Suite</span>
+              <span className="text-[10px] uppercase font-black text-red-600 tracking-widest leading-none">AI Evaluator</span>
             </div>
           </div>
           
           {view === 'report' && report && (
             <div className="flex items-center gap-3">
               <button 
-                onClick={() => {
-                  const content = `Evaluation Report: ${report.studentName}\nScore: ${report.totalScore}/${report.maxScore}\n\nQuestions:\n` + 
-                    report.questions.map(q => `${q.qNo}: ${q.feedback} (${q.marks}/${q.maxMarks})`).join('\n') +
-                    `\n\nOverall Performance: ${report.generalFeedback.overallPerformance}`;
-                  navigator.clipboard.writeText(content);
-                  alert("Report Content Copied! Ready to paste into Word.");
-                }}
-                className="px-6 py-2.5 text-slate-600 hover:text-slate-900 text-sm font-bold transition-colors hidden md:flex items-center gap-2 border border-slate-200 rounded-xl hover:bg-slate-50"
-              >
-                Copy for Word
-              </button>
-              <button 
                 onClick={handleExportPDF}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-blue-500/20"
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-red-500/20"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                Export PDF
+                Print Official Copy
               </button>
             </div>
           )}
@@ -195,10 +197,10 @@ const App: React.FC = () => {
             <div className="no-print mt-8 flex justify-center">
               <button 
                 onClick={() => setView('dashboard')}
-                className="bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-900 px-6 py-2 rounded-full flex items-center gap-2 font-bold text-sm transition-all border border-slate-200"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 px-6 py-2 rounded-full flex items-center gap-2 font-bold text-sm transition-all border border-slate-200"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                New Analysis
+                Upload New Paper
               </button>
             </div>
             <FeedbackReport report={report} />
@@ -206,12 +208,10 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <div className="fixed top-0 right-0 -z-10 opacity-5 pointer-events-none no-print overflow-hidden w-full h-full">
-        <svg className="absolute -right-20 -top-20 animate-float" width="600" height="600" viewBox="0 0 400 400">
-           <circle cx="200" cy="200" r="180" stroke="black" strokeWidth="1" fill="none" strokeDasharray="10 10" />
-           <path d="M100,50 Q150,0 200,50 T300,50" stroke="black" fill="none" />
-        </svg>
-      </div>
+      {/* Decorative footer elements */}
+      <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence Suite v4.0.2</p>
+      </footer>
     </div>
   );
 };

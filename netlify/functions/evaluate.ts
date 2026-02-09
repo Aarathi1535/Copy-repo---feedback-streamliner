@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const handler = async (event: any) => {
@@ -18,39 +19,33 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are a world-class Medical Evaluator and Math Auditor for Anatomy Guru. 
-      Analyze the provided documents:
-      1. Source Document: Contains Question Paper, Answer Key, and Student's Answers.
-      2. Dirty Feedback Document: Contains manual marks and notes from a faculty evaluator.
-
-      CORE MISSION: 
-      1. EXTRACT MARKS: Find every individual mark assigned to every question in the "Dirty Feedback Document".
-      2. ENHANCE FEEDBACK: Professionalize the evaluator's messy notes into high-quality, constructive feedback.
-      3. SUMMATION AUDIT (CRITICAL):
-         - Identify the "Grand Total Score" explicitly written by the faculty member.
-         - Independently sum up every individual question mark you found.
-         - Compare the Faculty's Total vs Your Calculated Sum.
-         - Report the result in 'summationAudit'. If they mismatch (e.g., faculty wrote 64 but marks add up to 65), set isCorrect to false and explain the discrepancy.
-
-      STRICT RULES:
-      - Do NOT change the individual marks. Use what the faculty wrote.
-      - The main 'totalScore' field must be the one WRITTEN by the faculty.
-      - The 'summationAudit' field is where you report if the faculty made a mathematical error in their head.
+      You are an expert Medical Professor and Senior Evaluator at Anatomy Guru.
+      
+      CORE MISSION:
+      1. ANALYZE GAPS: Compare the student's handwritten or typed answers (from the Source Document) against the standard Answer Key. Identify EXACTLY what is missing or incorrect.
+      2. GENERATE NON-GENERIC FEEDBACK: Do not use generic phrases. Provide actionable, specific medical advice based on the student's actual gaps.
+         - Example: Instead of "Improve clinical signs," say "Mention Atlanta classification and Ranson's score as requested in the clinical prompt."
+      3. EXTRACT MARKS: Extract marks exactly as written by the human faculty in the "Dirty Feedback Document".
+      4. SUMMATION AUDIT: Calculate the sum of individual marks internally and compare to the stated total to ensure backend data integrity.
+      
+      OUTPUT FORMATTING (Match the Anatomy Guru Style):
+      - Feedback must be a list of 3-5 concise, specific bullet points per question.
+      - Each bullet point must address a specific missing concept or a required correction.
+      - Topics usually include: Investigations, Treatment (step-wise), Pathogenesis, and Clinical Features.
     `;
 
     const createPart = (data: any, label: string) => {
       if (data.isDocx && data.text) {
         return [
-          { text: `${label}: (Extracted Text)` },
-          { text: data.text }
+          { text: `${label}: (Extracted Text Content)\n${data.text}` }
         ];
       } else if (data.base64 && data.mimeType) {
         return [
-          { text: `${label}: (Binary File)` },
+          { text: `${label}: (Document Content)` },
           { inlineData: { data: data.base64, mimeType: data.mimeType } }
         ];
       }
-      return [{ text: `${label}: No data available.` }];
+      return [{ text: `${label}: Empty.` }];
     };
 
     const response = await ai.models.generateContent({
@@ -58,9 +53,9 @@ export const handler = async (event: any) => {
       contents: [
         {
           parts: [
-            ...createPart(sourceDoc, "Source Document (QP + Key + Answers)"),
-            ...createPart(dirtyFeedbackDoc, "Manual Evaluator Notes (Audit Source)"),
-            { text: "Return the professionalized report in JSON format. Include the mandatory 'summationAudit' check." }
+            ...createPart(sourceDoc, "Student Answer Sheet & Question Paper"),
+            ...createPart(dirtyFeedbackDoc, "Manual Faculty Notes"),
+            { text: "Generate the itemized feedback report. Be specific to the student's gaps. Ensure all marks match the faculty notes." }
           ]
         }
       ],
@@ -72,62 +67,48 @@ export const handler = async (event: any) => {
           properties: {
             studentName: { type: Type.STRING },
             testTitle: { type: Type.STRING },
+            testTopics: { type: Type.STRING },
             testDate: { type: Type.STRING },
             totalScore: { type: Type.NUMBER },
             maxScore: { type: Type.NUMBER },
-            summationAudit: {
-              type: Type.OBJECT,
-              properties: {
-                isCorrect: { type: Type.BOOLEAN },
-                manualTotal: { type: Type.NUMBER },
-                calculatedTotal: { type: Type.NUMBER },
-                discrepancyMessage: { type: Type.STRING, nullable: true }
-              },
-              required: ["isCorrect", "manualTotal", "calculatedTotal"]
-            },
             questions: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedback: { type: Type.STRING },
-                  marks: { type: Type.NUMBER },
-                  maxMarks: { type: Type.NUMBER },
-                  isCorrect: { type: Type.BOOLEAN }
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  marks: { type: Type.NUMBER }
                 },
-                required: ["qNo", "feedback", "marks", "maxMarks", "isCorrect"]
+                required: ["qNo", "feedbackPoints", "marks"]
               }
             },
             generalFeedback: {
               type: Type.OBJECT,
               properties: {
                 overallPerformance: { type: Type.STRING },
-                mcqs: { type: Type.STRING },
-                contentAccuracy: { type: Type.ARRAY, items: { type: Type.STRING } },
-                completeness: { type: Type.ARRAY, items: { type: Type.STRING } },
-                presentation: { type: Type.ARRAY, items: { type: Type.STRING } },
-                investigations: { type: Type.ARRAY, items: { type: Type.STRING } },
                 actionPoints: { type: Type.ARRAY, items: { type: Type.STRING } }
-              },
-              required: ["overallPerformance", "mcqs", "contentAccuracy", "completeness", "presentation", "investigations", "actionPoints"]
+              }
             }
           },
-          required: ["studentName", "testTitle", "totalScore", "maxScore", "questions", "generalFeedback", "summationAudit"]
+          required: ["studentName", "testTitle", "testTopics", "questions"]
         }
       }
     });
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*" 
+      },
       body: response.text,
     };
   } catch (error: any) {
     console.error("Function Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || "Internal Evaluation Error" }),
+      body: JSON.stringify({ error: error.message || "Evaluation Failed" }),
     };
   }
 };
