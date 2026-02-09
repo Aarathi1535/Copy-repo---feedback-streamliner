@@ -19,43 +19,37 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are an expert Medical Professor and Senior Evaluator at Anatomy Guru.
+      You are the Master Medical Evaluator for Anatomy Guru. Your task is to transform messy evaluation notes into a gold-standard academic report.
+
+      CRITICAL OBJECTIVES:
+      1. GAP ANALYSIS: Compare the Source Document (Student Answers) against standard medical knowledge. Identify EXACT gaps.
+      2. SPECIFICITY: Never provide generic feedback like "Well done" or "Improve content". 
+         - WRONG: "Mention complications."
+         - RIGHT: "Detail complications specifically: bleeding, perforation, gastric outlet obstruction (GOO)."
+         - WRONG: "Include treatment."
+         - RIGHT: "Provide step-wise management: antacids, H2RA, PPI, and anti-H. pylori regimen."
+      3. MARKS INTEGRITY: Extract marks exactly as recorded by the human faculty in the "Dirty Feedback Document".
+      4. SUMMATION AUDIT: Calculate the total marks internally. If you detect a math error (e.g., student given 64 but marks add to 65), record it in your internal log, but the final output should reflect the faculty's written marks for each question.
       
-      CORE MISSION:
-      1. ANALYZE GAPS: Compare the student's handwritten or typed answers (from the Source Document) against the standard Answer Key. Identify EXACTLY what is missing or incorrect.
-      2. GENERATE NON-GENERIC FEEDBACK: Do not use generic phrases. Provide actionable, specific medical advice based on the student's actual gaps.
-         - Example: Instead of "Improve clinical signs," say "Mention Atlanta classification and Ranson's score as requested in the clinical prompt."
-      3. EXTRACT MARKS: Extract marks exactly as written by the human faculty in the "Dirty Feedback Document".
-      4. SUMMATION AUDIT: Calculate the sum of individual marks internally and compare to the stated total to ensure backend data integrity.
-      
-      OUTPUT FORMATTING (Match the Anatomy Guru Style):
-      - Feedback must be a list of 3-5 concise, specific bullet points per question.
-      - Each bullet point must address a specific missing concept or a required correction.
-      - Topics usually include: Investigations, Treatment (step-wise), Pathogenesis, and Clinical Features.
+      FEEDBACK STYLE:
+      - Use a professional, academic tone.
+      - Each question must have 3-5 high-impact bullet points.
+      - Focus on: Definition/Pathology, Causes, Investigations (Non-invasive vs Invasive), Treatment (Step-wise), and Clinical Signs (e.g., Ranson's score).
     `;
 
-    const createPart = (data: any, label: string) => {
-      if (data.isDocx && data.text) {
-        return [
-          { text: `${label}: (Extracted Text Content)\n${data.text}` }
-        ];
-      } else if (data.base64 && data.mimeType) {
-        return [
-          { text: `${label}: (Document Content)` },
-          { inlineData: { data: data.base64, mimeType: data.mimeType } }
-        ];
-      }
-      return [{ text: `${label}: Empty.` }];
-    };
-
+    // Increased timeout logic handled by Netlify, but we use gemini-3-pro-preview for complex reasoning on long papers
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: [
         {
           parts: [
-            ...createPart(sourceDoc, "Student Answer Sheet & Question Paper"),
-            ...createPart(dirtyFeedbackDoc, "Manual Faculty Notes"),
-            { text: "Generate the itemized feedback report. Be specific to the student's gaps. Ensure all marks match the faculty notes." }
+            { text: "SOURCE DOCUMENT (Student Answers & Key):" },
+            { text: sourceDoc.text || (sourceDoc.base64 ? `[Binary File: ${sourceDoc.mimeType}]` : "No content") },
+            ...(sourceDoc.base64 ? [{ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } }] : []),
+            { text: "FACULTY NOTES (Marks & Raw Feedback):" },
+            { text: dirtyFeedbackDoc.text || (dirtyFeedbackDoc.base64 ? `[Binary File: ${dirtyFeedbackDoc.mimeType}]` : "No content") },
+            ...(dirtyFeedbackDoc.base64 ? [{ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } }] : []),
+            { text: "Generate the itemized feedback report JSON. Ensure non-generic, high-fidelity gap analysis for every question listed in the faculty notes." }
           ]
         }
       ],
@@ -88,10 +82,11 @@ export const handler = async (event: any) => {
               properties: {
                 overallPerformance: { type: Type.STRING },
                 actionPoints: { type: Type.ARRAY, items: { type: Type.STRING } }
-              }
+              },
+              required: ["overallPerformance", "actionPoints"]
             }
           },
-          required: ["studentName", "testTitle", "testTopics", "questions"]
+          required: ["studentName", "testTitle", "testTopics", "questions", "generalFeedback"]
         }
       }
     });
@@ -105,10 +100,12 @@ export const handler = async (event: any) => {
       body: response.text,
     };
   } catch (error: any) {
-    console.error("Function Error:", error);
+    console.error("Evaluation Function Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || "Evaluation Failed" }),
+      body: JSON.stringify({ 
+        error: "The evaluation engine encountered an issue processing your request. This is often due to document size or processing limits on large 100-mark papers. Try uploading smaller PDF chunks or ensuring text is clear." 
+      }),
     };
   }
 };

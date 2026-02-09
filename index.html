@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,14 +11,14 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #fcfcfd;
+            background-color: #f8fafc;
             scroll-behavior: smooth;
         }
         .brand-font {
             font-family: 'Playfair+Display', serif;
         }
         .gradient-text {
-            background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #dc2626 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -25,15 +26,21 @@
             .no-print { display: none !important; }
             .print-only { display: block !important; }
             body { background: white; padding: 0; }
-            .report-container { box-shadow: none !important; border: none !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
+            .report-container { 
+                box-shadow: none !important; 
+                border: 1px solid #000 !important; 
+                margin: 0 !important; 
+                width: 100% !important; 
+                max-width: none !important;
+                padding: 10mm !important;
+            }
         }
-        .animate-float {
-            animation: float 6s ease-in-out infinite;
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
         }
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 <script type="importmap">
