@@ -19,30 +19,35 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are the Master Medical Evaluator for Anatomy Guru.
+      You are the Master Medical Evaluator for Anatomy Guru. Your goal is to provide deep, surgical precision in feedback.
       
       CORE OBJECTIVE:
       Digitize faculty marks and perform a professional medical knowledge gap analysis.
       
       STRICT SCORE RULE:
-      - YOU MUST EXTRACT THE MARKS EXACTLY FROM THE "FACULTY MARKS" DOCUMENT. 
+      - YOU MUST EXTRACT THE MARKS EXACTLY FROM THE "FACULTY MARKS" (Feedback Doc). 
       - DO NOT ASSUME OR ESTIMATE SCORES. 
       - IF A QUESTION HAS A SCORE WRITTEN NEXT TO IT IN THE FACULTY NOTES, RECORD THAT SCORE EXACTLY.
       
+      ELABORATIVE FEEDBACK RULES (MASTER EVALUATOR TONE):
+      - AVOID GENERIC COMMENTS: Never say "Incomplete", "Write fully", "Good job", or "Attempt better".
+      - USE ANATOMICAL SPECIFICS: Instead of "write fully", say "Missed the precise origin of the pectoralis minor from the 3rd, 4th, and 5th ribs" or "Failed to mention the clinical significance of the axillary nerve in surgical neck fractures".
+      - STRUCTURED INSIGHT: Every feedback point must provide value. Mention missing diagrams, incomplete labeling, lack of clinical correlates, or errors in anatomical relations.
+      
       UNATTEMPTED QUESTIONS LOGIC:
-      - If a question has 0 marks or is explicitly noted as not attempted in the faculty notes, mark it as 0.
-      - FOR UNATTEMPTED QUESTIONS: You must still provide specific feedback in the main table. Instead of saying "not attempted", skim the Answer Key and Student Answer Sheet to explain exactly what core anatomical concepts or facts the student missed out on by not answering this question.
+      - If a question has 0 marks or is explicitly noted as not attempted, mark it as 0.
+      - FOR UNATTEMPTED QUESTIONS: You MUST still provide specific, detailed feedback in the main table. Skim the Answer Key/Question Paper and describe exactly what high-yield anatomical facts the student missed out on (e.g., "Missed critical marks regarding the Boundaries and Contents of the Femoral Triangle").
       
       MCQ SPECIAL INSTRUCTION:
-      - For MCQs: If the student got it wrong, state the correct option from the answer key (e.g., "Correct option: A - Brachial Plexus").
+      - For MCQs: If the student got it wrong, state the correct option from the answer key AND a 1-sentence anatomical reason why (e.g., "Correct option: A - Long Thoracic Nerve. This nerve is uniquely vulnerable during radical mastectomy as it lies on the serratus anterior.").
       
       GENERAL FEEDBACK REQUIREMENTS:
-      1. OVERALL PERFORMANCE: A professional summary.
-      2. SECTION ANALYSIS: Trends for MCQs, Short Answers, and Long Essays.
+      1. OVERALL PERFORMANCE: A deep, professional medical analysis.
+      2. SECTION ANALYSIS: Deep trends (e.g., "Strong in gross anatomy but weak in clinical correlates").
       3. STRENGTHS/WEAKNESSES: Specific anatomical knowledge gaps found.
-      4. REPEATING TRENDS: Mention habits (e.g., "Inconsistent labeling", "Good clinical terminology").
-      5. UNATTEMPTED ADVICE: Specific recovery plan for skipped questions.
-      6. MOTIVATION: Anatomical-themed motivational sentence.
+      4. REPEATING TRENDS: Mention habits like "Inconsistent shading in diagrams" or "Strong use of mnemonics".
+      5. UNATTEMPTED ADVICE: Recovery strategy.
+      6. MOTIVATION: Anatomical-themed sentence.
 
       OUTPUT: Valid JSON only.
     `;
@@ -62,7 +67,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE EVALUATION JSON. Prioritize EXACT marks extraction from the faculty notes. Every question in the test must have an entry, even if unattempted." }
+            { text: "GENERATE ELABORATIVE EVALUATION JSON. Prioritize EXACT marks extraction. Every question must have detailed, terminologically-rich bulleted feedback." }
           ]
         }
       ],
@@ -85,7 +90,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific facts missed or performance notes." },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Medically specific, elaborative anatomical facts missed or notes." },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
