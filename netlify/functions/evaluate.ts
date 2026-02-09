@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const handler = async (event: any) => {
-  // Increase execution time limit is managed via netlify.toml, but we optimize code here.
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
@@ -13,53 +12,51 @@ export const handler = async (event: any) => {
     if (!process.env.API_KEY) {
       return { 
         statusCode: 500, 
-        body: JSON.stringify({ error: "API Key not configured. Please add it to Netlify environment variables." }) 
+        body: JSON.stringify({ error: "API Key missing in environment." }) 
       };
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are the Master Medical Evaluator and Lead Auditor for Anatomy Guru. 
-      You are processing a COMPREHENSIVE MEDICAL EXAMINATION (potentially 100+ marks).
-      
-      CORE AUDIT PROTOCOL:
-      1. EXHAUSTIVE EXTRACTION: Process every single question found in the Faculty Notes. Do not skip any.
-      2. GAP ANALYSIS: Compare student answers against the standard answer key. Identify EXACT concepts missed.
-      3. SPECIFICITY: Provide deep, medical-grade feedback. 
-         - Avoid generic "Good" or "Incomplete". 
-         - Provide specific missing anatomical structures, clinical scores, or pharmacological regimens.
-      4. INTERNAL MATH AUDIT:
-         - Sum every individual question mark extracted.
-         - Compare to the faculty's written total score.
-         - Log discrepancies internally, but do not include an 'audit' section in the final JSON output for the student.
-      5. DATA INTEGRITY: The final JSON 'questions' array must match the total count of evaluated items in the faculty notes.
+      You are the Master Medical Evaluator for Anatomy Guru.
+      Task: Create a gold-standard academic feedback report for a medical test (potentially up to 100 marks).
 
-      ANATOMY GURU STYLE:
-      - Concise but information-dense bullet points.
-      - Standardized terminology (e.g., 'Step-wise management', 'Differential Diagnosis', 'Clinical Staging').
+      INPUTS:
+      1. SOURCE DOC: Student's answers or the paper key.
+      2. FACULTY NOTES: Raw marks and messy feedback scrawled by the evaluator.
+
+      RULES:
+      - Process EVERY question mentioned in the Faculty Notes.
+      - Provide 3-5 high-impact, specific bullet points for EACH question.
+      - Use exact medical terminology. Avoid generic feedback.
+      - Extract the 'marks' for each question exactly from the Faculty Notes.
+      - Ensure the output is valid JSON.
+
+      FORMATTING:
+      - overallPerformance: Professional summary of student strength/weakness.
+      - actionPoints: 4-6 specific steps for clinical/academic improvement.
     `;
 
-    // Using gemini-3-flash-preview because it is significantly faster and more robust for high-token/long-context medical documents.
+    // Use gemini-3-flash-preview for speed/latency to stay within Netlify's execution limit.
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
         {
           parts: [
-            { text: "STUDENT PERFORMANCE DATA (Source Doc):" },
-            { text: sourceDoc.text || (sourceDoc.base64 ? `[Embedded Document Data]` : "No content provided") },
+            { text: "SOURCE DATA:" },
+            { text: sourceDoc.text || (sourceDoc.base64 ? `[File Content]` : "None") },
             ...(sourceDoc.base64 ? [{ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } }] : []),
-            
-            { text: "FACULTY EVALUATION NOTES (Marks Source):" },
-            { text: dirtyFeedbackDoc.text || (dirtyFeedbackDoc.base64 ? `[Embedded Faculty Data]` : "No content provided") },
+            { text: "FACULTY MARKS & COMMENTS:" },
+            { text: dirtyFeedbackDoc.text || (dirtyFeedbackDoc.base64 ? `[File Content]` : "None") },
             ...(dirtyFeedbackDoc.base64 ? [{ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } }] : []),
-            
-            { text: "TASK: Generate the comprehensive feedback report. Ensure every question from the faculty notes is detailed with 3-5 specific bullet points. Maintain the highest medical accuracy." }
+            { text: "GENERATE STRUCTURED EVALUATION JSON." }
           ]
         }
       ],
       config: {
         systemInstruction,
+        temperature: 0, // Deterministic and faster
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -91,26 +88,23 @@ export const handler = async (event: any) => {
               required: ["overallPerformance", "actionPoints"]
             }
           },
-          required: ["studentName", "testTitle", "testTopics", "totalScore", "maxScore", "questions", "generalFeedback"]
+          required: ["studentName", "testTitle", "testTopics", "questions", "generalFeedback"]
         }
       }
     });
 
     return {
       statusCode: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*" 
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       body: response.text,
     };
   } catch (error: any) {
-    console.error("Evaluation Function Error:", error);
-    // Explicitly handle common Netlify/API errors for the user
+    console.error("Netlify Function Error Log:", error);
+    const msg = error.message || "Unknown error";
     return {
       statusCode: 500,
       body: JSON.stringify({ 
-        error: "System processing limit reached for this specific document set. Recommendation: Ensure PDFs are optimized (compressed) or process in sections if exceeding 40 pages." 
+        error: `AI Evaluation Error: ${msg}. If this is a very large 100-mark paper, try split-processing or ensuring the PDF has a selectable text layer.` 
       }),
     };
   }

@@ -6,12 +6,18 @@ import FileUploader from './components/FileUploader';
 import FeedbackReport from './components/FeedbackReport';
 // @ts-ignore
 import mammoth from 'mammoth';
+// @ts-ignore
+import * as pdfjs from 'pdfjs-dist';
+
+// Set up PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
 
 const App: React.FC = () => {
   const [sourceDoc, setSourceDoc] = useState<File | null>(null);
   const [dirtyFeedbackDoc, setDirtyFeedbackDoc] = useState<File | null>(null);
   const [report, setReport] = useState<EvaluationReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'dashboard' | 'report'>('dashboard');
 
@@ -19,45 +25,65 @@ const App: React.FC = () => {
     if (report) setView('report');
   }, [report]);
 
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+    }
+    return fullText;
+  };
+
   const processFile = async (file: File): Promise<FileData> => {
-    const isDocx = file.name.toLowerCase().endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const fileName = file.name.toLowerCase();
+    const isDocx = fileName.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isPdf = fileName.endsWith('.pdf') || file.type === 'application/pdf';
     
     if (isDocx) {
+      setLoadingStep(`Extracting text from Word doc: ${file.name}`);
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
-      return {
-        text: result.value,
-        name: file.name,
-        isDocx: true
-      };
-    } else {
-      // PDF or Image
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        // Netlify Functions have a 6MB total payload limit. 
-        // We warn if combined files might exceed this.
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-      });
-      return {
-        base64,
-        mimeType: file.type,
-        name: file.name,
-        isDocx: false
-      };
+      return { text: result.value, name: file.name, isDocx: true };
+    } 
+    
+    if (isPdf) {
+      setLoadingStep(`Checking PDF for text layer: ${file.name}`);
+      try {
+        const text = await extractTextFromPDF(file);
+        // If we extracted a decent amount of text, send text instead of image
+        if (text.trim().length > 100) {
+          return { text, name: file.name, isDocx: false };
+        }
+      } catch (e) {
+        console.warn("PDF text extraction failed, falling back to Vision", e);
+      }
     }
+
+    // Fallback for Scanned PDFs or Images
+    setLoadingStep(`Processing visual data for: ${file.name}`);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+    });
+    return {
+      base64,
+      mimeType: file.type,
+      name: file.name,
+      isDocx: false
+    };
   };
 
   const handleAnalyze = async () => {
     if (!sourceDoc || !dirtyFeedbackDoc) {
       setError("Both the 'Source Document' and 'Faculty Notes' are required.");
-      return;
-    }
-
-    const totalSize = (sourceDoc.size + dirtyFeedbackDoc.size) / (1024 * 1024);
-    if (totalSize > 5.5) {
-      setError(`Documents total ${totalSize.toFixed(1)}MB. To process large 100-mark papers, please ensure each PDF is under 2.5MB or use optimized/compressed files.`);
       return;
     }
 
@@ -68,20 +94,21 @@ const App: React.FC = () => {
       const sourceData = await processFile(sourceDoc);
       const feedbackData = await processFile(dirtyFeedbackDoc);
 
+      setLoadingStep("AI evaluating 100-mark paper... this may take 20-30 seconds.");
       const result = await generateStructuredFeedback(sourceData, feedbackData);
       setReport(result);
     } catch (err: any) {
       console.error("Analysis Failure:", err);
-      // Rectifying potential 404/Function errors with more descriptive messages
-      if (err.message.includes("404")) {
-        setError("Network Error: The AI evaluation service is temporarily unavailable (404). Please ensure the application is correctly deployed to Netlify.");
-      } else if (err.message.includes("status: 500")) {
-        setError("Server Error: The AI engine timed out. This often happens with very large image-heavy documents. Try converting your images to a single compressed PDF.");
+      if (err.message.includes("413")) {
+        setError("Payload Too Large: These files exceed the 6MB Netlify limit. Recommendation: Compress your PDFs or ensure they have a selectable text layer (not just images).");
+      } else if (err.message.includes("status: 500") || err.message.includes("AI Evaluation Error")) {
+        setError(err.message || "The AI engine timed out or reached a limit. For very large papers, ensure they are text-selectable or split them into sections.");
       } else {
         setError(err.message || "An unexpected error occurred during evaluation.");
       }
     } finally {
       setIsLoading(false);
+      setLoadingStep('');
     }
   };
 
@@ -95,7 +122,7 @@ const App: React.FC = () => {
         <h1 className="text-5xl font-black text-slate-900 mb-4 tracking-tighter">
           Medical <span className="gradient-text">Evaluation</span>
         </h1>
-        <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+        <p className="text-lg text-slate-500 max-w-2xl mx-auto font-medium">
           Official Anatomy Guru processing engine. Optimized for standard tests and comprehensive 100-mark medical papers.
         </p>
       </header>
@@ -122,9 +149,10 @@ const App: React.FC = () => {
           <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center shrink-0">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
           </div>
-          <div>
+          <div className="flex-1">
             <p className="font-black uppercase tracking-widest text-[10px] mb-1">Processing Error</p>
-            <span className="font-semibold text-base">{error}</span>
+            <span className="font-semibold text-base block mb-2">{error}</span>
+            <p className="text-xs text-rose-500 italic">Tip: If this is a large 100-mark paper, try using a PDF with a text layer or convert images to a single optimized PDF.</p>
           </div>
         </div>
       )}
@@ -132,22 +160,27 @@ const App: React.FC = () => {
       <button
         onClick={handleAnalyze}
         disabled={isLoading || !sourceDoc || !dirtyFeedbackDoc}
-        className={`w-full py-6 rounded-2xl font-black text-xl shadow-2xl transition-all flex items-center justify-center gap-3 relative overflow-hidden ${
+        className={`w-full py-6 rounded-2xl font-black text-xl shadow-2xl transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${
           isLoading 
           ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
           : 'bg-slate-900 hover:bg-slate-800 text-white hover:-translate-y-1 active:scale-95 shadow-slate-300'
         }`}
       >
         {isLoading ? (
-          <div className="flex items-center gap-4">
-            <svg className="animate-spin h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <span className="animate-pulse tracking-widest uppercase text-sm">Processing High-Volume Paper...</span>
-          </div>
-        ) : (
           <>
+            <div className="flex items-center gap-4">
+              <svg className="animate-spin h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <span className="animate-pulse tracking-widest uppercase text-sm font-black">Generating Report</span>
+            </div>
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 opacity-70">
+              {loadingStep}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             Generate Official Feedback
-          </>
+          </div>
         )}
       </button>
     </div>
@@ -189,7 +222,7 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4">
         {view === 'dashboard' && renderDashboard()}
         {view === 'report' && report && (
-          <div className="relative animate-fade-in-up pb-20">
+          <div className="relative animate-fade-in pb-20">
             <div className="no-print mt-8 flex justify-center">
               <button 
                 onClick={() => {
@@ -209,7 +242,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence Suite v4.5.0</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence Suite v4.6.1</p>
       </footer>
     </div>
   );
