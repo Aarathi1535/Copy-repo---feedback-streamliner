@@ -41,7 +41,6 @@ const App: React.FC = () => {
     const pdf = await loadingTask.promise;
     let fullText = '';
     
-    // Process pages one by one to avoid memory spikes
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
@@ -64,19 +63,17 @@ const App: React.FC = () => {
     } 
     
     if (isPdf) {
-      setLoadingStep(`Extracting PDF Text: ${file.name}`);
+      setLoadingStep(`Extracting PDF: ${file.name}`);
       try {
         const text = await extractTextFromPDF(file);
-        // If the PDF has text content, we ONLY send the text to save bandwidth/memory
         if (text.trim().length > 150) {
           return { text, name: file.name, isDocx: false };
         }
       } catch (e) {
-        console.warn("PDF text extraction failed, falling back to Vision", e);
+        console.warn("PDF extraction fallback to Vision", e);
       }
     }
 
-    // Fallback for Scanned PDFs or Images (ONLY send if text extraction failed)
     setLoadingStep(`Encoding Visual Data: ${file.name}`);
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -95,7 +92,7 @@ const App: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!sourceDoc || !dirtyFeedbackDoc) {
-      setError("Please upload both the Source Document and Faculty Notes.");
+      setError("Please upload both the Answer Sheet and Faculty Notes.");
       return;
     }
 
@@ -106,18 +103,12 @@ const App: React.FC = () => {
       const sourceData = await processFile(sourceDoc);
       const feedbackData = await processFile(dirtyFeedbackDoc);
 
-      setLoadingStep("AI analyzing paper structure...");
+      setLoadingStep("AI performing gap analysis...");
       const result = await generateStructuredFeedback(sourceData, feedbackData);
       setReport(result);
     } catch (err: any) {
       console.error("Analysis Failure:", err);
-      if (err.message.includes("413")) {
-        setError("Payload too large (6MB limit). Recommendation: Use a PDF with a selectable text layer instead of a scanned image PDF.");
-      } else if (err.message.includes("500") || err.message.includes("timeout")) {
-        setError("The evaluation timed out (26s limit). For 100-mark papers, ensure files are optimized or process in smaller sections.");
-      } else {
-        setError(err.message || "An error occurred during evaluation.");
-      }
+      setError(err.message || "An error occurred during evaluation.");
     } finally {
       setIsLoading(false);
       setLoadingStep('');
@@ -125,7 +116,16 @@ const App: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    window.print();
+    if (sourceDoc) {
+      const originalTitle = document.title;
+      // Strip extension to suggest a clean filename in browser print
+      const baseName = sourceDoc.name.replace(/\.[^/.]+$/, "");
+      document.title = baseName;
+      window.print();
+      document.title = originalTitle;
+    } else {
+      window.print();
+    }
   };
 
   const renderDashboard = () => (
@@ -135,21 +135,21 @@ const App: React.FC = () => {
           Medical <span className="gradient-text">Evaluation</span>
         </h1>
         <p className="text-lg text-slate-500 max-w-2xl mx-auto font-medium">
-          Official Anatomy Guru processing engine. Optimized for standard tests and comprehensive 100-mark medical papers.
+          Professional Anatomy Guru feedback engine. Extracts exact faculty marks and identifies student knowledge gaps.
         </p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 h-full">
         <FileUploader
-          label="Source Document"
-          description="Question Paper + Answer Sheet (PDF/DOCX)"
+          label="Student Answer Sheet"
+          description="Source PDF or DOCX file"
           onFileSelect={setSourceDoc}
           selectedFile={sourceDoc}
           icon={<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>}
         />
         <FileUploader
           label="Faculty Notes"
-          description="Evaluator Marks & Scrawled Comments"
+          description="Evaluator marks and handwritten comments"
           onFileSelect={setDirtyFeedbackDoc}
           selectedFile={dirtyFeedbackDoc}
           icon={<svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>}
@@ -181,7 +181,7 @@ const App: React.FC = () => {
           <>
             <div className="flex items-center gap-4">
               <svg className="animate-spin h-6 w-6 text-red-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              <span className="animate-pulse tracking-widest uppercase text-sm font-black">Dissecting Paper</span>
+              <span className="animate-pulse tracking-widest uppercase text-sm font-black">Synthesizing Feedback</span>
             </div>
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 opacity-70">
               {loadingStep}
@@ -190,7 +190,7 @@ const App: React.FC = () => {
         ) : (
           <div className="flex items-center gap-3">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Generate Official Feedback
+            Generate Professional Feedback
           </div>
         )}
       </button>
@@ -212,7 +212,7 @@ const App: React.FC = () => {
             <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl group-hover:rotate-12 transition-all">A</div>
             <div>
               <span className="brand-font text-2xl font-black tracking-tighter text-slate-900 block leading-none">AnatomyGuru</span>
-              <span className="text-[10px] uppercase font-black text-red-600 tracking-widest leading-none">Intelligence Suite</span>
+              <span className="text-[10px] uppercase font-black text-red-600 tracking-widest leading-none">Evaluation Suite</span>
             </div>
           </div>
           
@@ -233,7 +233,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.3</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Intelligence v4.6.5</p>
       </footer>
     </div>
   );

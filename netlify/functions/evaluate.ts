@@ -20,27 +20,36 @@ export const handler = async (event: any) => {
     
     const systemInstruction = `
       You are the Master Medical Evaluator for Anatomy Guru.
-      Task: Generate a gold-standard academic feedback report (up to 100 marks).
       
-      CRITICAL: If textual data is provided, use it primarily. If base64 data is provided, it is a visual scan.
+      CORE OBJECTIVE:
+      You are transforming manual faculty marks into a professional digital feedback report.
+      You MUST perform a deep "Gap Analysis" by comparing the student's answer sheet to the faculty's final decision.
+
+      INPUTS:
+      1. STUDENT ANSWER SHEET (SOURCE): The student's written response.
+      2. FACULTY MANUAL FEEDBACK: The evaluator's marks (e.g. 3/5, 8/10, etc) and scrawled notes.
+
+      STRICT EVALUATION RULES:
+      - EXACT MARKS: Look at the Faculty Manual Feedback. Extract the EXACT marks assigned to each question. DO NOT recalculate or "improve" the grade. If the teacher gave 2/5, the JSON MUST reflect 2.
+      - UNATTEMPTED QUESTIONS: If a question number appears in the mark sheet with 0 marks, or if it is missing from the student answer sheet, identify it as "NOT ATTEMPTED".
+      - GAP ANALYSIS FEEDBACK: 
+          * For questions with lost marks: Identify precisely what medical facts, diagrams, or explanations were missing from the student's sheet.
+          * For correct answers: Acknowledge the strength (e.g., "Excellent anatomical detail").
+          * Use 3-5 specific bullet points per question.
+      - COLOR HINTS: For feedback that represents a correct answer or strength, ensure the tone is positive. For gaps or unattempted questions, focus on "Missing concepts" or "Not attempted".
+      - PROFESSIONALISM: Use high-level medical and anatomical terminology only.
       
-      RULES:
-      - Detail EVERY question found in Faculty Notes.
-      - 3-5 high-impact bullet points per question.
-      - Exact medical terminology.
-      - Marks must be exact integers.
-      - Output valid JSON only.
+      OUTPUT FORMAT: Valid JSON only.
     `;
 
-    // Priority handling: If text exists, we use it to avoid expensive vision processing on large papers.
-    const sourceParts: any[] = [{ text: "SOURCE DATA:" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET:" }];
     if (sourceDoc.text) {
       sourceParts.push({ text: sourceDoc.text });
     } else if (sourceDoc.base64) {
       sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
     }
 
-    const feedbackParts: any[] = [{ text: "FACULTY EVALUATION DATA:" }];
+    const feedbackParts: any[] = [{ text: "FACULTY MARKS (GROUND TRUTH):" }];
     if (dirtyFeedbackDoc.text) {
       feedbackParts.push({ text: dirtyFeedbackDoc.text });
     } else if (dirtyFeedbackDoc.base64) {
@@ -48,13 +57,13 @@ export const handler = async (event: any) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash is essential for staying within Netlify's 26s execution window
+      model: "gemini-2.5-flash", 
       contents: [
         {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE COMPLETE STRUCTURED EVALUATION JSON." }
+            { text: "GENERATE FULL STRUCTURED EVALUATION JSON. Ensure marks are exact integers extracted from the notes." }
           ]
         }
       ],
@@ -77,7 +86,11 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  feedbackPoints: { 
+                    type: Type.ARRAY, 
+                    items: { type: Type.STRING },
+                    description: "Feedback bullets. Mention 'NOT ATTEMPTED' clearly if applicable."
+                  },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
@@ -86,8 +99,8 @@ export const handler = async (event: any) => {
             generalFeedback: {
               type: Type.OBJECT,
               properties: {
-                overallPerformance: { type: Type.STRING },
-                actionPoints: { type: Type.ARRAY, items: { type: Type.STRING } }
+                overallPerformance: { type: Type.STRING, description: "Professional summary paragraph." },
+                actionPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific improvement steps." }
               },
               required: ["overallPerformance", "actionPoints"]
             }
@@ -106,9 +119,7 @@ export const handler = async (event: any) => {
     console.error("Evaluation Function Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ 
-        error: `AI Evaluation Error: ${error.message || "Unknown error"}. Try optimized PDFs for larger papers.` 
-      }),
+      body: JSON.stringify({ error: `AI Error: ${error.message || "Unknown error"}.` }),
     };
   }
 };
