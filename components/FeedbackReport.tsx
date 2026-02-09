@@ -56,7 +56,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               <circle cx="68" cy="62" r="3" fill="#f59e0b" />
             </svg> */}
              <img
-               src="/logo.jpg"
+               src="/components/logo.jpg"
                alt="Anatomy Guru Logo"
                className="w-full h-full object-contain"
               />
