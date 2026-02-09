@@ -9,8 +9,8 @@ import mammoth from 'mammoth';
 // @ts-ignore
 import * as pdfjs from 'pdfjs-dist';
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+// Set up PDF.js worker using a compatible CDN for v3.11.174
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 const App: React.FC = () => {
   const [sourceDoc, setSourceDoc] = useState<File | null>(null);
@@ -114,7 +114,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Added handleExportPDF to trigger the browser's print dialog for PDF export
   const handleExportPDF = () => {
     window.print();
   };
