@@ -20,43 +20,47 @@ export const handler = async (event: any) => {
     
     const systemInstruction = `
       You are the Master Medical Evaluator for Anatomy Guru.
-      Task: Create a gold-standard academic feedback report for a medical test (potentially up to 100 marks).
-
-      INPUTS:
-      1. SOURCE DOC: Student's answers or the paper key.
-      2. FACULTY NOTES: Raw marks and messy feedback scrawled by the evaluator.
-
+      Task: Generate a gold-standard academic feedback report (up to 100 marks).
+      
+      CRITICAL: If textual data is provided, use it primarily. If base64 data is provided, it is a visual scan.
+      
       RULES:
-      - Process EVERY question mentioned in the Faculty Notes.
-      - Provide 3-5 high-impact, specific bullet points for EACH question.
-      - Use exact medical terminology. Avoid generic feedback.
-      - Extract the 'marks' for each question exactly from the Faculty Notes.
-      - Ensure the output is valid JSON.
-
-      FORMATTING:
-      - overallPerformance: Professional summary of student strength/weakness.
-      - actionPoints: 4-6 specific steps for clinical/academic improvement.
+      - Detail EVERY question found in Faculty Notes.
+      - 3-5 high-impact bullet points per question.
+      - Exact medical terminology.
+      - Marks must be exact integers.
+      - Output valid JSON only.
     `;
 
-    // Use gemini-3-flash-preview for speed/latency to stay within Netlify's execution limit.
+    // Priority handling: If text exists, we use it to avoid expensive vision processing on large papers.
+    const sourceParts: any[] = [{ text: "SOURCE DATA:" }];
+    if (sourceDoc.text) {
+      sourceParts.push({ text: sourceDoc.text });
+    } else if (sourceDoc.base64) {
+      sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
+    }
+
+    const feedbackParts: any[] = [{ text: "FACULTY EVALUATION DATA:" }];
+    if (dirtyFeedbackDoc.text) {
+      feedbackParts.push({ text: dirtyFeedbackDoc.text });
+    } else if (dirtyFeedbackDoc.base64) {
+      feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
+    }
+
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-flash-preview", // Flash is essential for staying within Netlify's 26s execution window
       contents: [
         {
           parts: [
-            { text: "SOURCE DATA:" },
-            { text: sourceDoc.text || (sourceDoc.base64 ? `[File Content]` : "None") },
-            ...(sourceDoc.base64 ? [{ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } }] : []),
-            { text: "FACULTY MARKS & COMMENTS:" },
-            { text: dirtyFeedbackDoc.text || (dirtyFeedbackDoc.base64 ? `[File Content]` : "None") },
-            ...(dirtyFeedbackDoc.base64 ? [{ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } }] : []),
-            { text: "GENERATE STRUCTURED EVALUATION JSON." }
+            ...sourceParts,
+            ...feedbackParts,
+            { text: "GENERATE COMPLETE STRUCTURED EVALUATION JSON." }
           ]
         }
       ],
       config: {
         systemInstruction,
-        temperature: 0, // Deterministic and faster
+        temperature: 0.1,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -88,7 +92,7 @@ export const handler = async (event: any) => {
               required: ["overallPerformance", "actionPoints"]
             }
           },
-          required: ["studentName", "testTitle", "testTopics", "questions", "generalFeedback"]
+          required: ["studentName", "testTitle", "questions", "generalFeedback"]
         }
       }
     });
@@ -99,12 +103,11 @@ export const handler = async (event: any) => {
       body: response.text,
     };
   } catch (error: any) {
-    console.error("Netlify Function Error Log:", error);
-    const msg = error.message || "Unknown error";
+    console.error("Evaluation Function Error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ 
-        error: `AI Evaluation Error: ${msg}. If this is a very large 100-mark paper, try split-processing or ensuring the PDF has a selectable text layer.` 
+        error: `AI Evaluation Error: ${error.message || "Unknown error"}. Try optimized PDFs for larger papers.` 
       }),
     };
   }

@@ -31,11 +31,12 @@ const App: React.FC = () => {
     const pdf = await loadingTask.promise;
     let fullText = '';
     
+    // Process pages one by one to avoid memory spikes
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+      fullText += `[P${i}] ${pageText}\n`;
     }
     return fullText;
   };
@@ -46,18 +47,18 @@ const App: React.FC = () => {
     const isPdf = fileName.endsWith('.pdf') || file.type === 'application/pdf';
     
     if (isDocx) {
-      setLoadingStep(`Extracting text from Word doc: ${file.name}`);
+      setLoadingStep(`Parsing DOCX: ${file.name}`);
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       return { text: result.value, name: file.name, isDocx: true };
     } 
     
     if (isPdf) {
-      setLoadingStep(`Checking PDF for text layer: ${file.name}`);
+      setLoadingStep(`Extracting PDF Text: ${file.name}`);
       try {
         const text = await extractTextFromPDF(file);
-        // If we extracted a decent amount of text, send text instead of image
-        if (text.trim().length > 100) {
+        // If the PDF has text content, we ONLY send the text to save bandwidth/memory
+        if (text.trim().length > 150) {
           return { text, name: file.name, isDocx: false };
         }
       } catch (e) {
@@ -65,14 +66,15 @@ const App: React.FC = () => {
       }
     }
 
-    // Fallback for Scanned PDFs or Images
-    setLoadingStep(`Processing visual data for: ${file.name}`);
+    // Fallback for Scanned PDFs or Images (ONLY send if text extraction failed)
+    setLoadingStep(`Encoding Visual Data: ${file.name}`);
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve((reader.result as string).split(',')[1]);
       reader.onerror = reject;
     });
+
     return {
       base64,
       mimeType: file.type,
@@ -83,7 +85,7 @@ const App: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!sourceDoc || !dirtyFeedbackDoc) {
-      setError("Both the 'Source Document' and 'Faculty Notes' are required.");
+      setError("Please upload both the Source Document and Faculty Notes.");
       return;
     }
 
@@ -94,17 +96,17 @@ const App: React.FC = () => {
       const sourceData = await processFile(sourceDoc);
       const feedbackData = await processFile(dirtyFeedbackDoc);
 
-      setLoadingStep("AI evaluating 100-mark paper... this may take 20-30 seconds.");
+      setLoadingStep("AI analyzing paper structure...");
       const result = await generateStructuredFeedback(sourceData, feedbackData);
       setReport(result);
     } catch (err: any) {
       console.error("Analysis Failure:", err);
       if (err.message.includes("413")) {
-        setError("Payload Too Large: These files exceed the 6MB Netlify limit. Recommendation: Compress your PDFs or ensure they have a selectable text layer (not just images).");
-      } else if (err.message.includes("status: 500") || err.message.includes("AI Evaluation Error")) {
-        setError(err.message || "The AI engine timed out or reached a limit. For very large papers, ensure they are text-selectable or split them into sections.");
+        setError("Payload too large (6MB limit). Recommendation: Use a PDF with a selectable text layer instead of a scanned image PDF.");
+      } else if (err.message.includes("500") || err.message.includes("timeout")) {
+        setError("The evaluation timed out (26s limit). For 100-mark papers, ensure files are optimized or process in smaller sections.");
       } else {
-        setError(err.message || "An unexpected error occurred during evaluation.");
+        setError(err.message || "An error occurred during evaluation.");
       }
     } finally {
       setIsLoading(false);
@@ -112,6 +114,7 @@ const App: React.FC = () => {
     }
   };
 
+  // Fix: Added handleExportPDF to trigger the browser's print dialog for PDF export
   const handleExportPDF = () => {
     window.print();
   };
@@ -145,14 +148,13 @@ const App: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-600 p-6 rounded-2xl mb-8 text-sm flex items-start gap-4 animate-shake shadow-lg shadow-rose-500/10">
-          <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center shrink-0">
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 p-6 rounded-2xl mb-8 flex items-start gap-4 animate-shake shadow-lg">
+          <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center shrink-0 text-rose-600">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
           </div>
-          <div className="flex-1">
+          <div>
             <p className="font-black uppercase tracking-widest text-[10px] mb-1">Processing Error</p>
-            <span className="font-semibold text-base block mb-2">{error}</span>
-            <p className="text-xs text-rose-500 italic">Tip: If this is a large 100-mark paper, try using a PDF with a text layer or convert images to a single optimized PDF.</p>
+            <span className="font-semibold text-base">{error}</span>
           </div>
         </div>
       )}
@@ -162,15 +164,15 @@ const App: React.FC = () => {
         disabled={isLoading || !sourceDoc || !dirtyFeedbackDoc}
         className={`w-full py-6 rounded-2xl font-black text-xl shadow-2xl transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${
           isLoading 
-          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-          : 'bg-slate-900 hover:bg-slate-800 text-white hover:-translate-y-1 active:scale-95 shadow-slate-300'
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
+          : 'bg-slate-900 hover:bg-slate-800 text-white hover:-translate-y-1 active:scale-95'
         }`}
       >
         {isLoading ? (
           <>
             <div className="flex items-center gap-4">
-              <svg className="animate-spin h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              <span className="animate-pulse tracking-widest uppercase text-sm font-black">Generating Report</span>
+              <svg className="animate-spin h-6 w-6 text-red-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <span className="animate-pulse tracking-widest uppercase text-sm font-black">Dissecting Paper</span>
             </div>
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 opacity-70">
               {loadingStep}
@@ -206,43 +208,23 @@ const App: React.FC = () => {
           </div>
           
           {view === 'report' && report && (
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={handleExportPDF}
-                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-red-500/20"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                Export Official Copy
-              </button>
-            </div>
+            <button 
+              onClick={handleExportPDF}
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-red-500/20"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+              Export PDF
+            </button>
           )}
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-4">
-        {view === 'dashboard' && renderDashboard()}
-        {view === 'report' && report && (
-          <div className="relative animate-fade-in pb-20">
-            <div className="no-print mt-8 flex justify-center">
-              <button 
-                onClick={() => {
-                  setReport(null);
-                  setView('dashboard');
-                  setError(null);
-                }}
-                className="bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 px-6 py-2 rounded-full flex items-center gap-2 font-bold text-sm transition-all border border-slate-200 shadow-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                New Analysis
-              </button>
-            </div>
-            <FeedbackReport report={report} />
-          </div>
-        )}
+        {view === 'dashboard' ? renderDashboard() : <FeedbackReport report={report} />}
       </main>
 
       <footer className="mt-20 py-10 border-t border-slate-100 no-print text-center opacity-40">
-        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence Suite v4.6.1</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]">Anatomy Guru Medical Intelligence v4.6.2</p>
       </footer>
     </div>
   );
