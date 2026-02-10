@@ -11,17 +11,14 @@ export interface UnattemptedAdvice {
 }
 
 export interface GeneralFeedbackSection {
-  overallPerformance: string;
-  sectionAnalysis: {
-    mcqs: string;
-    shortAnswers: string;
-    longEssays: string;
-  };
-  strengths: string[];
-  weaknesses: string[];
-  repeatingTrends: string[];
-  unattemptedAdvice: UnattemptedAdvice[];
-  closingMotivation: string;
+  overallPerformance: string[];
+  mcqs: string[];
+  contentAccuracy: string[];
+  completenessOfAnswers: string[];
+  presentationDiagrams: string[];
+  investigations: string[];
+  attemptingQuestions: string[];
+  actionPoints: string[];
 }
 
 export interface EvaluationReport {

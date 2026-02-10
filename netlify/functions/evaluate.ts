@@ -19,31 +19,29 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are the "Anatomy Guru Master Evaluator". Your feedback must be "dissected" with medical precision.
+      You are the "Anatomy Guru Master Evaluator". Your goal is to produce a feedback report identical in structure to the provided reference image.
       
       CORE OBJECTIVE:
       Digitize faculty marks and perform a professional medical knowledge gap analysis.
       
       STRICT SCORE RULE:
       - EXTRACT MARKS EXACTLY from the "FACULTY MARKS" (Feedback Doc). 
-      - If a score is written next to a question in the faculty notes, use that EXACT number.
-      - DO NOT calculate or guess scores unless the faculty note is a sum of parts.
+      - DO NOT calculate or guess scores.
       
-      ELABORATIVE FEEDBACK (THE APPRECIATED STYLE):
-      - NO GENERIC COMMENTS: Never use "incomplete", "write more", or "improve diagrams".
-      - ANATOMICAL DEPTH: Use specific terminology. 
-        - Bad: "Diagram is incomplete."
-        - Good (Appreciated): "The schematic of the Brachial Plexus missed the posterior cord's contribution to the axillary nerve, a critical surgical landmark for shoulder dislocations."
-        - Good (Appreciated): "While the muscle group was identified, you failed to specify the 'double nerve supply' of the Pectineus muscle (Femoral and Obturator nerves)."
-      - CLINICAL RELEVANCE: Link errors to clinical outcomes where possible (e.g., surgical risks, nerve palsies).
-      
-      UNATTEMPTED QUESTIONS:
-      - If marks are 0 or noted as skipped, record 0.
-      - For the feedback, do not just say "Not attempted". Skim the Answer Key and provide a bulleted list of the HIGH-YIELD concepts the student missed (e.g., "Missed critical marks for the course of the Ulnar nerve through the Canal of Guyon").
-      
-      MCQ SPECIAL INSTRUCTION:
-      - State the correct option AND the anatomical rationale (e.g., "Correct option: C - Median Nerve. This nerve is the only one passing through the carpal tunnel under the flexor retinaculum.").
-      
+      GENERAL FEEDBACK LOGIC (STRICT 8-POINT STRUCTURE):
+      1. Overall Performance: Summarize the score and general attempt quality. Mention the student's name.
+      2. MCQs: Break down performance (e.g., "3 correct, 3 incorrect") and give high-yield revision advice.
+      3. Content Accuracy: Identify specific conceptual errors (e.g., "Hodgkin lymphoma subtype misidentified").
+      4. Completeness of Answers: List specific questions (by Q No) that were incomplete or lacked essential descriptors.
+      5. Presentation & Diagrams: Evaluate the use of flowcharts and specific anatomical diagrams (e.g., "No Reed-Sternberg cell diagrams drawn").
+      6. Investigations: Address the inclusion of laboratory investigations (CBC, smear, platelet count, etc.).
+      7. Attempting All Questions: Feedback on coverage and the importance of structured points even for unknown questions.
+      8. What to do next (Action points): Provide a concrete study/practice plan with specific fixed structures (e.g., Definition -> Classification -> Clinical features).
+
+      ELABORATIVE FEEDBACK FOR QUESTIONS:
+      - Bullet points must be medically specific. Use anatomical terms, landmarks, and clinical correlates.
+      - For unattempted questions, summarize what core concepts were missed.
+
       OUTPUT: Valid JSON only.
     `;
 
@@ -62,13 +60,13 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE ELABORATIVE EVALUATION JSON. Ensure marks are identical to faculty notes. Every feedback point must be medically descriptive and specific." }
+            { text: "GENERATE EVALUATION JSON. Follow the 8-point General Feedback structure precisely as requested." }
           ]
         }
       ],
       config: {
         systemInstruction,
-        temperature: 0.2,
+        temperature: 0.1,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -85,7 +83,7 @@ export const handler = async (event: any) => {
                 type: Type.OBJECT,
                 properties: {
                   qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Medically specific, elaborative anatomical insights." },
+                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
                   marks: { type: Type.NUMBER }
                 },
                 required: ["qNo", "feedbackPoints", "marks"]
@@ -94,33 +92,16 @@ export const handler = async (event: any) => {
             generalFeedback: {
               type: Type.OBJECT,
               properties: {
-                overallPerformance: { type: Type.STRING },
-                sectionAnalysis: {
-                  type: Type.OBJECT,
-                  properties: {
-                    mcqs: { type: Type.STRING },
-                    shortAnswers: { type: Type.STRING },
-                    longEssays: { type: Type.STRING }
-                  },
-                  required: ["mcqs", "shortAnswers", "longEssays"]
-                },
-                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-                weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-                repeatingTrends: { type: Type.ARRAY, items: { type: Type.STRING } },
-                unattemptedAdvice: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      qNo: { type: Type.STRING },
-                      advice: { type: Type.STRING }
-                    },
-                    required: ["qNo", "advice"]
-                  }
-                },
-                closingMotivation: { type: Type.STRING }
+                overallPerformance: { type: Type.ARRAY, items: { type: Type.STRING } },
+                mcqs: { type: Type.ARRAY, items: { type: Type.STRING } },
+                contentAccuracy: { type: Type.ARRAY, items: { type: Type.STRING } },
+                completenessOfAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                presentationDiagrams: { type: Type.ARRAY, items: { type: Type.STRING } },
+                investigations: { type: Type.ARRAY, items: { type: Type.STRING } },
+                attemptingQuestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                actionPoints: { type: Type.ARRAY, items: { type: Type.STRING } }
               },
-              required: ["overallPerformance", "sectionAnalysis", "strengths", "weaknesses", "repeatingTrends", "unattemptedAdvice", "closingMotivation"]
+              required: ["overallPerformance", "mcqs", "contentAccuracy", "completenessOfAnswers", "presentationDiagrams", "investigations", "attemptingQuestions", "actionPoints"]
             }
           },
           required: ["studentName", "testTitle", "questions", "generalFeedback"]
