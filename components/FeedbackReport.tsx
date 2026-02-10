@@ -1,4 +1,4 @@
-
+import logo from './logo.jpg';
 import React from 'react';
 import { EvaluationReport } from '../types';
 
@@ -64,7 +64,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
         <div className="flex items-center justify-center gap-6">
           <div className="relative w-32 h-32 flex items-center justify-center">
              <img
-               src="/components/logo.jpg"
+               src={logo}
                alt="Anatomy Guru Logo"
                className="w-full h-full object-contain"
              />
