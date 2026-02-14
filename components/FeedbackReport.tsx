@@ -62,13 +62,14 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
       {/* Brand Header */}
       <div className="flex flex-col items-center mb-8">
         <div className="flex items-center justify-center gap-6">
-          <div className="flex justify-center py-4">
+          <header className="text-center py-2">
           <img
             src={logo}
             alt="Anatomy Guru Logo"
-            className="h-20 w-auto object-contain"
+            className="h-16 mx-auto"
           />
-        </div>
+        </header>
+
 
 
           {/* <div className="flex justify-center mb-8">
