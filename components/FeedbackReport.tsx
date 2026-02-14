@@ -1,4 +1,4 @@
-import logo from './logo.jpg';
+import logo from './Anatomy_Guru_Updated__Logo_CDR.jpg';
 import React from 'react';
 import { EvaluationReport } from '../types';
 
