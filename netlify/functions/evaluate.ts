@@ -2,47 +2,46 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const handler = async (event: any) => {
-  // Check for body existence to prevent parsing errors
-  if (!event.body) return { statusCode: 400, body: "Missing request body" };
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
   try {
     const { sourceDoc, dirtyFeedbackDoc } = JSON.parse(event.body);
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: "API Key missing" }) };
+    if (!process.env.API_KEY) return { statusCode: 500, body: JSON.stringify({ error: "API Key missing" }) };
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Ultrafast, context-aware prompt
-    const systemInstruction = `Anatomy Professor AI. 
-Inputs: S (Student Script), N (Faculty Notes).
-Objective: Insightful evaluation. 
+    // System instruction tuned for Anatomy Guru evaluation
+    const systemInstruction = `Anatomy Guru Evaluator. 
 Rules: 
-1. Marks: Source from N only. 
-2. Feedback: Contrast S vs medical standards. 
-3. Terms: Use relations, correlates, morphological. 
-4. Gaps: Identify omissions in S. 
-5. JSON: Strict output. 
-N/A sections (MCQs/Labs) => 'Not applicable'.`;
+1. Marks: Extract strictly from 'Faculty Notes'. 
+2. Feedback: Detail-rich analysis of 'Student Script'. Contrast script text vs medical standards. 
+3. No Hallucination: Feedback must reflect script content. If missing, mark 'Not attempted'. 
+4. Relevance: For non-existent test sections (MCQs/Labs), state 'Not applicable'. 
+5. General Feedback: Mandatory 8-point structure.
+JSON Output strictly required.`;
 
-    const contents = {
-      parts: [
-        { text: "S:" },
-        ...(sourceDoc.text ? [{ text: sourceDoc.text }] : [{ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } }]),
-        { text: "N:" },
-        ...(dirtyFeedbackDoc.text ? [{ text: dirtyFeedbackDoc.text }] : [{ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } }]),
-        { text: "Output JSON:" }
-      ]
-    };
+    const sourceParts: any[] = [{ text: "SCRIPT:" }];
+    if (sourceDoc.text) {
+      sourceParts.push({ text: sourceDoc.text });
+    } else if (sourceDoc.base64) {
+      sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
+    }
+
+    const feedbackParts: any[] = [{ text: "NOTES:" }];
+    if (dirtyFeedbackDoc.text) {
+      feedbackParts.push({ text: dirtyFeedbackDoc.text });
+    } else if (dirtyFeedbackDoc.base64) {
+      feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
+    }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", 
-      contents,
+      model: "gemini-2.5-flash", 
+      contents: [{ parts: [...sourceParts, ...feedbackParts, { text: "JSON Report:" }] }],
       config: {
         systemInstruction,
         temperature: 0.1,
-        maxOutputTokens: 2000,
-        thinkingConfig: { thinkingBudget: 0 }, // Disable thinking for speed
+        maxOutputTokens: 3000,
+        thinkingConfig: { thinkingBudget: 500 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -87,18 +86,13 @@ N/A sections (MCQs/Labs) => 'Not applicable'.`;
 
     return {
       statusCode: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*" 
-      },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       body: response.text,
     };
   } catch (error: any) {
-    console.error("Evaluation Function Error:", error);
-    // Explicitly return a 500 JSON error to help frontend diagnose
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: `Function processing failed: ${error.message}` }),
+      body: JSON.stringify({ error: error.message || "AI Error" }),
     };
   }
 };
