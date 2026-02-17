@@ -1,118 +1,87 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-
 export const handler = async (event: any) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
   try {
     const { sourceDoc, dirtyFeedbackDoc } = JSON.parse(event.body);
-    if (!process.env.API_KEY) return { statusCode: 500, body: JSON.stringify({ error: "API Key missing" }) };
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: "OpenAI API Key missing in environment" }) };
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // System instruction tuned for Anatomy Guru evaluation
-    const systemInstruction = `You are Anatomy Guru Evaluator.
+    // High-yield medical evaluation instructions for OpenAI
+    const systemInstruction = `You are the Anatomy Guru AI Evaluator. 
+Your goal is to provide a professional, medical-grade evaluation of a student's answer script based on faculty marking notes.
 
-Task:
-Evaluate the Student Script using only the provided Faculty Notes as the marking reference.
+Protocol:
+1. Marks: Strictly extract from Faculty Notes (N).
+2. Feedback: Contrast Student Script (S) against medical standards. Use anatomical terms (landmarks, relations, correlates).
+3. Insights: Identify specific knowledge gaps in S.
+4. Gaps: If a question is in N but not in S, mark as "Not attempted".
+5. Relevance: If sections like MCQs or Investigations are absent, mark as "Not applicable to this test format".
+6. Format: Output ONLY valid JSON matching the requested schema.`;
 
-Input Handling:
-- Faculty Notes will be provided as a PDF.
-- Student Script will be provided as a PDF.
-- Extract and use content only from these documents.
-- Do not assume or invent any content beyond what is explicitly present.
+    const isImage = (mime?: string) => mime?.startsWith('image/');
 
-Rules:
-1. Marks must be derived strictly from Faculty Notes. Do not infer or extrapolate.
-2. Feedback must be detail-rich and must explicitly compare Student Script content with accepted medical standards as reflected in the Faculty Notes.
-3. Do not hallucinate. If a required answer or section is missing in the Student Script, state exactly "Not attempted".
-4. If a test section does not exist in the PDFs (e.g., MCQs, Labs), state exactly "Not applicable".
-5. General Feedback is mandatory and must contain exactly 8 clear, distinct points.
-6. Feedback must reflect only what is written in the Student Script.
+    // Construct multi-modal payload for OpenAI GPT-4o
+    const userContent: any[] = [
+      { type: "text", text: "Student Script (S) Content: " + (sourceDoc.text || "See provided images.") },
+    ];
 
-Output Requirements:
-- Respond ONLY in valid JSON.
-- Do not include any text outside the JSON object.
-- Ensure all required fields are present.
-- Use explicit strings ("Not attempted", "Not applicable") instead of empty values.
-- If output validity is at risk, internally correct and return valid JSON.
-
-Begin evaluation after fully reading both PDFs.
-`;
-
-    const sourceParts: any[] = [{ text: "SCRIPT:" }];
-    if (sourceDoc.text) {
-      sourceParts.push({ text: sourceDoc.text });
-    } else if (sourceDoc.base64) {
-      sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
+    if (sourceDoc.base64 && isImage(sourceDoc.mimeType)) {
+      userContent.push({ 
+        type: "image_url", 
+        image_url: { url: `data:${sourceDoc.mimeType};base64,${sourceDoc.base64}` } 
+      });
     }
 
-    const feedbackParts: any[] = [{ text: "NOTES:" }];
-    if (dirtyFeedbackDoc.text) {
-      feedbackParts.push({ text: dirtyFeedbackDoc.text });
-    } else if (dirtyFeedbackDoc.base64) {
-      feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
+    userContent.push({ type: "text", text: "Faculty Notes (N) Content: " + (dirtyFeedbackDoc.text || "See provided images.") });
+
+    if (dirtyFeedbackDoc.base64 && isImage(dirtyFeedbackDoc.mimeType)) {
+      userContent.push({ 
+        type: "image_url", 
+        image_url: { url: `data:${dirtyFeedbackDoc.mimeType};base64,${dirtyFeedbackDoc.base64}` } 
+      });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", 
-      contents: [{ parts: [...sourceParts, ...feedbackParts, { text: "JSON Report:" }] }],
-      config: {
-        systemInstruction,
-        temperature: 0.1,
-        maxOutputTokens: 3000,
-        thinkingConfig: { thinkingBudget: 500 },
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            studentName: { type: Type.STRING },
-            testTitle: { type: Type.STRING },
-            testTopics: { type: Type.STRING },
-            testDate: { type: Type.STRING },
-            totalScore: { type: Type.NUMBER },
-            maxScore: { type: Type.NUMBER },
-            questions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  qNo: { type: Type.STRING },
-                  feedbackPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  marks: { type: Type.NUMBER }
-                },
-                required: ["qNo", "feedbackPoints", "marks"]
-              }
-            },
-            generalFeedback: {
-              type: Type.OBJECT,
-              properties: {
-                overallPerformance: { type: Type.ARRAY, items: { type: Type.STRING } },
-                mcqs: { type: Type.ARRAY, items: { type: Type.STRING } },
-                contentAccuracy: { type: Type.ARRAY, items: { type: Type.STRING } },
-                completenessOfAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
-                presentationDiagrams: { type: Type.ARRAY, items: { type: Type.STRING } },
-                investigations: { type: Type.ARRAY, items: { type: Type.STRING } },
-                attemptingQuestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                actionPoints: { type: Type.ARRAY, items: { type: Type.STRING } }
-              },
-              required: ["overallPerformance", "mcqs", "contentAccuracy", "completenessOfAnswers", "presentationDiagrams", "investigations", "attemptingQuestions", "actionPoints"]
-            }
-          },
-          required: ["studentName", "testTitle", "questions", "generalFeedback"]
-        }
-      }
+    userContent.push({ type: "text", text: "Generate the Evaluation Report JSON based on the comparison of S and N." });
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: userContent }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1
+      })
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    const content = result.choices[0].message.content;
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-      body: response.text,
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*" 
+      },
+      body: content,
     };
   } catch (error: any) {
+    console.error("Evaluation Function Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || "AI Error" }),
+      body: JSON.stringify({ error: error.message || "An error occurred during AI processing." }),
     };
   }
 };
