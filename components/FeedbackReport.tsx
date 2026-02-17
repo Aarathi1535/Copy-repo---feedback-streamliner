@@ -80,22 +80,6 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
           />
           </div>
           
-          <div className="text-left border-l-2 border-slate-900 pl-6">
-            <div className="flex items-end gap-1 mb-1 leading-none">
-              <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">
-                ANATOMY <span className="text-orange-500">GURU</span>
-              </h1>
-              <span className="text-xs font-bold align-top ml-1">®</span>
-            </div>
-            <p className="text-[16px] italic text-slate-600 font-bold mb-2">Nothing Left Undissected !!</p>
-            <div className="w-64 h-6">
-              <svg viewBox="0 0 200 20" className="w-full h-full">
-                <path d="M0 10 H150 L190 4 L155 16 H0 Z" fill="#1e1e1e" />
-                <circle cx="15" cy="10" r="2" fill="white" />
-                <rect x="80" y="8" width="40" height="4" fill="white" opacity="0.3" rx="1" />
-              </svg>
-            </div>
-          </div>
       </div>
 
       {/* Metadata Section */}
