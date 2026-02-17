@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const handler = async (event: any) => {
@@ -18,25 +19,55 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-     Return a JSON object with key hello and value world.
+      You are the "Anatomy Guru Master Evaluator", a world-class medical professor.
+      
+      CORE OBJECTIVE:
+      Synthesize professional feedback by analyzing the 'Student Answer Sheet' in the context of the 'Faculty Notes/Answer Key'.
+      
+      INTELLIGENT EVALUATION LOGIC:
+      - DO NOT just transcribe the faculty's shorthand notes. Use them as a directional guide.
+      - CROSS-REFERENCE: Look at what the faculty noted (e.g., "missing points") and then find exactly what is missing in the student's actual answer script.
+      - CONSTRUCTIVE CRITIQUE: Instead of copying "poor diagrams" from the faculty notes, explain *why* they are poor by looking at the student's drawing (e.g., "The diagram of the Heart lacks the specific branching of the Coronary Arteries mentioned in your text").
+      - Use your deep medical knowledge to bridge the gap between faculty shorthand and student effort.
+      
+      STRICT SCORE RULE:
+      - EXTRACT MARKS EXACTLY from the "FACULTY MARKS" section of the Feedback Doc. 
+      - The marks provided by the faculty are the final source of truth for the score. DO NOT recalculate them.
+      
+      GENERAL FEEDBACK LOGIC (STRICT 8-POINT STRUCTURE - DO NOT ALTER):
+      1. Overall Performance: Summarize score and quality.
+      2. MCQs: Breakdown of performance and revision tips.
+      3. Content Accuracy: Highlighting specific anatomical/clinical errors found in the script.
+      4. Completeness of Answers: Detailed gaps found by comparing script to medical gold standards.
+      5. Presentation & Diagrams: Specific feedback on the visual quality of the student's actual drawings.
+      6. Investigations: Analysis of clinical/lab tests included (or missing) in the student's answers.
+      7. Attempting All Questions: Strategy for time management and coverage.
+      8. What to do next (Action points): Concrete steps based on the observed weaknesses.
+
+      ELABORATIVE FEEDBACK FOR QUESTIONS:
+      - Provide 2-3 bullet points per question.
+      - Use professional medical terminology (Anatomical landmarks, clinical signs, etc.).
+      - If faculty notes are brief, expand them into meaningful advice by analyzing the student's actual script content.
+
+      OUTPUT: Valid JSON only.
     `;
 
-    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET (SOURCE OF TRUTH FOR FEEDBACK):" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET (THE ACTUAL SCRIPT):" }];
     if (sourceDoc.text) sourceParts.push({ text: sourceDoc.text });
     else if (sourceDoc.base64) sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
 
-    const feedbackParts: any[] = [{ text: "FACULTY NOTES (SOURCE FOR MARKS & EVALUATOR INTENT):" }];
+    const feedbackParts: any[] = [{ text: "FACULTY NOTES + ANSWER KEY (THE EVALUATOR'S GUIDE):" }];
     if (dirtyFeedbackDoc.text) feedbackParts.push({ text: dirtyFeedbackDoc.text });
     else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
     const response = await ai.models.generateContent({
-      model: "models/gemini-1.5-pro", 
+      model: "gemini-3-flash-preview", 
       contents: [
         {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE EVALUATION JSON. Use faculty notes for marks. For feedback, perform a deep audit of the student script content. Do not transcribe; enhance and verify. Maintain the 8-point structure." }
+            { text: "GENERATE ELABORATIVE EVALUATION JSON. Compare the faculty's shorthand against the actual student script to suggest precise medical feedback. Maintain the 8-point structure." }
           ]
         }
       ],
