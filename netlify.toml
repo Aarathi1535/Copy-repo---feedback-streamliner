@@ -1,7 +1,15 @@
 
+# [functions]
+#   node_bundler = "esbuild"
+#   external_node_modules = ["@google/genai"]
+
+# [functions.evaluate]
+#   timeout = 60
+
+
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["@google/genai"]
 
 [functions.evaluate]
   timeout = 60
+  memory = 1024
