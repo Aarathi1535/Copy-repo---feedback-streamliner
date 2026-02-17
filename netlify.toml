@@ -4,4 +4,4 @@
   external_node_modules = ["@google/genai"]
 
 [functions.evaluate]
-  timeout = 30
+  timeout = 60
