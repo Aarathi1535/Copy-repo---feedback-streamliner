@@ -96,7 +96,6 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               </svg>
             </div>
           </div>
-        </div>
       </div>
 
       {/* Metadata Section */}
