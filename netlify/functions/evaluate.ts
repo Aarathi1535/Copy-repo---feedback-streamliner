@@ -19,42 +19,36 @@ export const handler = async (event: any) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const systemInstruction = `
-      You are the "Anatomy Guru Master Evaluator". You are conducting a high-stakes medical audit.
+      You are the "Anatomy Guru Master Evaluator". You are conducting a high-stakes clinical audit of a medical student's exam script.
       
-      YOUR DATA SOURCES:
-      1. STUDENT ANSWER SHEET: This is the PRIMARY EVIDENCE. You must read the student's actual handwritten or typed words here.
-      2. FACULTY NOTES: This is a GUIDE. It contains the MARKS and shorthand observations (e.g., "missing clinicals", "q4 incomplete").
+      CORE DATA SOURCES:
+      1. STUDENT ANSWER SHEET: The absolute source of truth for feedback content. You MUST read the student's specific anatomical descriptions and clinical reasoning.
+      2. FACULTY NOTES: The absolute source of truth for MARKS. Use these to understand the evaluator's intent and score.
 
-      STRICT EVALUATION PROTOCOL:
-      - STEP 1 (MARKS): Extract the marks for each question EXACTLY as written in the Faculty Notes. You have zero authority to change these numbers. Do not skip missed questions. Include them too.
-      - STEP 2 (VERIFICATION): For every question, locate the corresponding answer in the "Student Answer Sheet". 
-      - STEP 3 (ENHANCEMENT): Do NOT rewrite the faculty's shorthand. Instead, compare the student's actual answer against the faculty's critique. 
-        * Example: If faculty says "Missing diagrams", check the script. If the student attempted a diagram but it's poor, say: "Your sketch of the Axillary Artery lacks the specific anatomical relations to the cords of the Brachial Plexus."
-        * Example: If faculty says "Content weak", read the student's answer and identify the specific medical terminology or clinical correlation they failed to mention.
-      
-      STRICT RULES:
-      - NO TRANSCRIPTION: Never copy-paste the faculty's notes word-for-word into the feedback.
-      - NO HALLUCINATION: If the student didn't write anything for a question, state "Not attempted" or "No content found in script". Do not make up medical facts the student didn't include.
-      - MEDICAL PRECISION: Use high-level anatomical and clinical terminology (e.g., mention specific fascial planes, nerve segments, or venous drainage patterns).
-      
-      GENERAL FEEDBACK (8-POINT STRUCTURE - MANDATORY):
-      1. Overall Performance: High-level summary of the student's standing.
-      2. MCQs: Specific patterns found in their MCQ choices.
-      3. Content Accuracy: Highlighting factual errors vs. correct assertions in their script.
-      4. Completeness of Answers: Detailing missing components (e.g., "The description of the Liver is missing its peritoneal reflections").
-      5. Presentation & Diagrams: Professional critique of their actual drawing/handwriting quality.
-      6. Investigations: Reviewing the student's knowledge of diagnostic tests mentioned in the script.
-      7. Attempting All Questions: Feedback on coverage and time management evidence.
-      8. What to do next (Action points): 3-5 high-yield study targets based on the script's gaps.
+      STRICT FEEDBACK RULES (NO HALLUCINATION):
+      - MARKS: Extract question marks EXACTLY from Faculty Notes. Never invent scores.
+      - CONTENT ENHANCEMENT: Do not transcribe faculty notes. Read the student's answer for Question X. If the student wrote a partial answer, provide feedback that corrects their specific phrasing or adds the missing anatomical detail (e.g., "While you identified the median nerve, you omitted its relationship to the flexor digitorum superficialis mentioned in your script").
+      - RELEVANCE FILTER: If a section of the 8-point structure (e.g., MCQs, Investigations) is NOT present in the student's script or the question paper, DO NOT provide generic advice. Instead, strictly state: "Not applicable to this test format."
+      - SPECIFICITY: Avoid vague phrases like "good job" or "needs improvement". Use medical specifics: "The description of the popliteal fossa boundaries was accurate, but the contents were listed in incorrect medial-to-lateral order."
 
-      OUTPUT: Valid JSON only.
+      GENERAL FEEDBACK (8-POINT STRUCTURE - MANDATORY BUT CONDITIONAL CONTENT):
+      1. Overall Performance: Summary based strictly on the current attempt.
+      2. MCQs: If no MCQs are in the test, state "Not applicable". Otherwise, analyze patterns.
+      3. Content Accuracy: Detail factual errors found in the script.
+      4. Completeness of Answers: List specific anatomical sub-structures omitted in the script.
+      5. Presentation & Diagrams: Critique the student's actual sketches (or lack thereof) found in the script.
+      6. Investigations: If clinical labs/tests aren't relevant to these topics, state "Not applicable".
+      7. Attempting All Questions: Analysis of paper coverage.
+      8. What to do next (Action points): 3-5 concrete study targets derived from errors in the script.
+
+      OUTPUT: Valid JSON only. Ensure every field is populated accurately based on the EVIDENCE provided.
     `;
 
-    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET (SOURCE OF TRUTH FOR FEEDBACK):" }];
+    const sourceParts: any[] = [{ text: "STUDENT ANSWER SHEET (AUDIT THIS CONTENT):" }];
     if (sourceDoc.text) sourceParts.push({ text: sourceDoc.text });
     else if (sourceDoc.base64) sourceParts.push({ inlineData: { data: sourceDoc.base64, mimeType: sourceDoc.mimeType } });
 
-    const feedbackParts: any[] = [{ text: "FACULTY NOTES (SOURCE FOR MARKS & EVALUATOR INTENT):" }];
+    const feedbackParts: any[] = [{ text: "FACULTY NOTES (GET MARKS HERE):" }];
     if (dirtyFeedbackDoc.text) feedbackParts.push({ text: dirtyFeedbackDoc.text });
     else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
@@ -65,7 +59,7 @@ export const handler = async (event: any) => {
           parts: [
             ...sourceParts,
             ...feedbackParts,
-            { text: "GENERATE EVALUATION JSON. Use faculty notes for marks. For feedback, perform a deep audit of the student script content. Do not transcribe; enhance and verify. Maintain the 8-point structure." }
+            { text: "GENERATE EVALUATION JSON. Use faculty notes for marks. For feedback text, perform a deep audit of the student script content. If a section like MCQs or Investigations is not in the paper, mark it as 'Not applicable to this test format'. Maintain the 8-point structure." }
           ]
         }
       ],
