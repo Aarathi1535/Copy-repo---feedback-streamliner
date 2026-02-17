@@ -58,7 +58,7 @@ export const handler = async (event: any) => {
     else if (dirtyFeedbackDoc.base64) feedbackParts.push({ inlineData: { data: dirtyFeedbackDoc.base64, mimeType: dirtyFeedbackDoc.mimeType } });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", 
+      model: "models/gemini-1.5-pro", 
       contents: [
         {
           parts: [
