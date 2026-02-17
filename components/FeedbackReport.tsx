@@ -146,7 +146,7 @@ const FeedbackReport: React.FC<FeedbackReportProps> = ({ report }) => {
               );
             })}
             <tr className="bg-slate-50 border-t border-slate-400">
-              <td colSpan={2} className="p-3 border-r border-slate-400 text-right font-black uppercase tracking-widest text-slate-500" style={contentStyle}>
+              <td colSpan={2} className="p-3 border-r border-slate-400 text-center font-black uppercase tracking-widest text-slate-500" style={contentStyle}>
                 Total Score Summation
               </td>
               <td className="p-3 text-center font-black text-red-600 bg-white" style={headingStyle}>
